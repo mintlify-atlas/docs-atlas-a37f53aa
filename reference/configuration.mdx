@@ -1,0 +1,420 @@
+---
+title: Configuration
+description: Maven configuration, dependencies, and build settings for the Veterinaria ALFA Inventory System
+---
+
+## Maven Project Configuration
+
+The project uses **Maven** as its build tool with Java 21 as the target platform.
+
+### Project Coordinates
+
+<ResponseField name="groupId" type="string">
+  `com.mycompany`
+</ResponseField>
+
+<ResponseField name="artifactId" type="string">
+  `Refactorizacion-ALFA`
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  `1.0-SNAPSHOT`
+</ResponseField>
+
+<ResponseField name="modelVersion" type="string">
+  `4.0.0`
+</ResponseField>
+
+## Java Configuration
+
+### Compiler Settings
+
+The project is configured to use **Java 21** for both source and target compatibility:
+
+```xml
+<properties>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+</properties>
+```
+
+<ParamField path="maven.compiler.source" type="string" default="21">
+  Java source version for compilation
+</ParamField>
+
+<ParamField path="maven.compiler.target" type="string" default="21">
+  Java target version for bytecode generation
+</ParamField>
+
+<ParamField path="project.build.sourceEncoding" type="string" default="UTF-8">
+  Character encoding for source files
+</ParamField>
+
+## Dependencies
+
+### Runtime Dependencies
+
+<Accordion title="SQLite JDBC Driver">
+  **Artifact**: `org.xerial:sqlite-jdbc`
+  
+  **Version**: `3.41.2.1`
+  
+  **Purpose**: Provides JDBC connectivity to SQLite databases
+  
+  ```xml
+  <dependency>
+      <groupId>org.xerial</groupId>
+      <artifactId>sqlite-jdbc</artifactId>
+      <version>3.41.2.1</version>
+  </dependency>
+  ```
+  
+  **Usage**: Database operations in `InventarioDAO`
+</Accordion>
+
+<Accordion title="JCalendar">
+  **Artifact**: `com.toedter:jcalendar`
+  
+  **Version**: `1.4`
+  
+  **Purpose**: Provides `JDateChooser` component for date selection in Swing UI
+  
+  ```xml
+  <dependency>
+      <groupId>com.toedter</groupId>
+      <artifactId>jcalendar</artifactId>
+      <version>1.4</version>
+  </dependency>
+  ```
+  
+  **Usage**: Date picker widgets in view dialogs
+</Accordion>
+
+### Test Dependencies
+
+<Accordion title="JUnit Jupiter">
+  **Artifact**: `org.junit.jupiter:junit-jupiter`
+  
+  **Version**: `5.10.0`
+  
+  **Scope**: `test`
+  
+  **Purpose**: Unit testing framework for JUnit 5
+  
+  ```xml
+  <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.10.0</version>
+      <scope>test</scope>
+  </dependency>
+  ```
+  
+  **Usage**: Writing and running unit tests
+</Accordion>
+
+## Build Plugins
+
+### Maven Compiler Plugin
+
+Compiles Java source code to bytecode.
+
+<ResponseField name="groupId" type="string">
+  `org.apache.maven.plugins`
+</ResponseField>
+
+<ResponseField name="artifactId" type="string">
+  `maven-compiler-plugin`
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  `3.13.0`
+</ResponseField>
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>3.13.0</version>
+    <configuration>
+        <source>21</source>
+        <target>21</target>
+    </configuration>
+</plugin>
+```
+
+<Note>
+  The compiler plugin explicitly sets Java 21 as both source and target version, ensuring compatibility.
+</Note>
+
+### Maven JAR Plugin
+
+Creates a standard JAR file with manifest configuration.
+
+<ResponseField name="groupId" type="string">
+  `org.apache.maven.plugins`
+</ResponseField>
+
+<ResponseField name="artifactId" type="string">
+  `maven-jar-plugin`
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  `3.2.2`
+</ResponseField>
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-jar-plugin</artifactId>
+    <version>3.2.2</version>
+    <configuration>
+        <archive>
+            <manifest>
+                <mainClass>InventarioApp</mainClass>
+            </manifest>
+        </archive>
+    </configuration>
+</plugin>
+```
+
+**Main Class**: `InventarioApp`
+
+<Note>
+  This plugin creates a standard JAR that requires external dependencies to be in the classpath.
+</Note>
+
+### Maven Shade Plugin
+
+Creates an executable "fat JAR" with all dependencies bundled.
+
+<ResponseField name="groupId" type="string">
+  `org.apache.maven.plugins`
+</ResponseField>
+
+<ResponseField name="artifactId" type="string">
+  `maven-shade-plugin`
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  `3.3.0`
+</ResponseField>
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-shade-plugin</artifactId>
+    <version>3.3.0</version>
+    <executions>
+        <execution>
+            <phase>package</phase>
+            <goals>
+                <goal>shade</goal>
+            </goals>
+            <configuration>
+                <createDependencyReducedPom>true</createDependencyReducedPom>
+                <transformers>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                        <mainClass>InventarioApp</mainClass>
+                    </transformer>
+                </transformers>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+```
+
+**Features**:
+- Bundles all dependencies into a single JAR
+- Creates an executable JAR with proper manifest
+- Generates a dependency-reduced POM
+- Runs during the `package` phase
+
+<Note>
+  The shade plugin creates `Refactorizacion-ALFA-1.0-SNAPSHOT.jar` with all dependencies included, making deployment easier.
+</Note>
+
+## Database Configuration
+
+### Connection URL
+
+The database connection is configured in `InventarioDAO` constructor:
+
+```java
+String carpetaBD = "./db";
+File folderFile = new File(carpetaBD);
+if (!folderFile.exists()) {
+    folderFile.mkdirs();
+}
+this.dbUrl = "jdbc:sqlite:" + carpetaBD + "/baseDeDatosInventario.db";
+```
+
+<ParamField path="carpetaBD" type="string" default="./db">
+  Directory for database file storage (relative to application location)
+</ParamField>
+
+<ParamField path="dbUrl" type="string">
+  JDBC connection URL in format: `jdbc:sqlite:./db/baseDeDatosInventario.db`
+</ParamField>
+
+### Connection Properties
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| **Driver Class** | `org.sqlite.JDBC` | SQLite JDBC driver |
+| **Database File** | `baseDeDatosInventario.db` | SQLite database filename |
+| **Auto-commit** | `true` (default) | Automatically commit transactions |
+| **Connection Reuse** | Yes | Single connection instance reused |
+
+### Custom Database Location
+
+To specify a custom database location, pass a JDBC URL to the DAO constructor:
+
+```java
+String customUrl = "jdbc:sqlite:/path/to/database.db";
+InventarioDAO dao = new InventarioDAO(customUrl);
+```
+
+## Build Commands
+
+### Compile the Project
+
+```bash
+mvn compile
+```
+
+Compiles Java source files to `target/classes/`.
+
+### Run Tests
+
+```bash
+mvn test
+```
+
+Executes JUnit tests located in `src/test/java/`.
+
+### Package Application
+
+```bash
+mvn package
+```
+
+Creates two JAR files in `target/`:
+1. Standard JAR: `Refactorizacion-ALFA-1.0-SNAPSHOT.jar`
+2. Fat JAR: `Refactorizacion-ALFA-1.0-SNAPSHOT-shaded.jar` (with dependencies)
+
+### Clean Build
+
+```bash
+mvn clean package
+```
+
+Removes `target/` directory and rebuilds from scratch.
+
+### Run Application
+
+#### From Maven
+
+```bash
+mvn exec:java -Dexec.mainClass="InventarioApp"
+```
+
+#### From JAR (requires dependencies in classpath)
+
+```bash
+java -jar target/Refactorizacion-ALFA-1.0-SNAPSHOT.jar
+```
+
+#### From Fat JAR (self-contained)
+
+```bash
+java -jar target/Refactorizacion-ALFA-1.0-SNAPSHOT-shaded.jar
+```
+
+## Project Structure
+
+```
+Refactorizacion-ALFA/
+├── pom.xml                          # Maven configuration
+├── src/
+│   ├── main/
+│   │   └── java/
+│   │       ├── InventarioApp.java   # Main entry point
+│   │       ├── controller/
+│   │       │   └── InventarioController.java
+│   │       ├── model/
+│   │       │   └── InventarioDAO.java
+│   │       └── view/
+│   │           ├── InventarioView.java
+│   │           ├── AgregarMedicamentoView.java
+│   │           ├── EditarMedicamentoView.java
+│   │           ├── VentasView.java
+│   │           ├── RegistrarVentaView.java
+│   │           ├── EditarVentaView.java
+│   │           ├── ApartadosView.java
+│   │           ├── RegistrarApartadoView.java
+│   │           └── EditarApartadoView.java
+│   └── test/
+│       └── java/                    # Unit tests (if any)
+├── target/                          # Build output
+└── db/                              # Database directory (created at runtime)
+    └── baseDeDatosInventario.db
+```
+
+## Environment Requirements
+
+<ParamField path="Java Runtime" type="JRE/JDK" required>
+  Java 21 or higher required to run the application
+</ParamField>
+
+<ParamField path="Maven" type="Build Tool">
+  Maven 3.x required for building from source
+</ParamField>
+
+<ParamField path="Operating System" type="OS">
+  Cross-platform (Windows, macOS, Linux) - uses SQLite and Java Swing
+</ParamField>
+
+<ParamField path="Display" type="GUI">
+  Graphical display required (X11, Windows Display, macOS window manager)
+</ParamField>
+
+## Dependency Tree
+
+```
+Refactorizacion-ALFA:1.0-SNAPSHOT
+├── org.xerial:sqlite-jdbc:3.41.2.1
+├── com.toedter:jcalendar:1.4
+└── org.junit.jupiter:junit-jupiter:5.10.0 (test)
+    ├── org.junit.jupiter:junit-jupiter-api:5.10.0
+    ├── org.junit.jupiter:junit-jupiter-params:5.10.0
+    └── org.junit.jupiter:junit-jupiter-engine:5.10.0
+```
+
+<Note>
+  The application has minimal external dependencies, making it lightweight and easy to deploy.
+</Note>
+
+## IDE Configuration
+
+### IntelliJ IDEA
+
+1. Open the project as a Maven project
+2. Ensure Java 21 SDK is configured
+3. Maven will auto-import dependencies
+4. Run configuration: Main class = `InventarioApp`
+
+### Eclipse
+
+1. Import as "Existing Maven Project"
+2. Configure Java 21 JDK in project properties
+3. Update Maven project to resolve dependencies
+4. Run as Java Application with `InventarioApp` as main class
+
+### VS Code
+
+1. Open folder with Java and Maven extensions installed
+2. Extensions will detect `pom.xml`
+3. Select Java 21 runtime
+4. Run using "Run Java" or Maven commands

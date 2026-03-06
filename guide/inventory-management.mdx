@@ -1,0 +1,277 @@
+---
+title: Inventory Management
+description: Comprehensive guide to managing product inventory in Veterinaria ALFA
+---
+
+## Overview
+
+The Inventory Management module allows you to add, edit, and delete products in your veterinary pharmacy inventory. All operations are handled through the `InventarioController` class and persist data to a SQLite database.
+
+## Database Schema
+
+Products are stored in the `productos` table with the following fields:
+
+- `id` (INTEGER, PRIMARY KEY, AUTOINCREMENT)
+- `nombre` (TEXT) - Product name
+- `existencias` (INTEGER) - Stock quantity
+- `lote` (TEXT) - Batch number
+- `caducidad` (TEXT) - Expiration date in `yyyy-MM` format
+- `fechaEntrada` (TEXT) - Entry date in `yyyy-MM-dd` format
+- `fecha_separado` (TEXT, nullable) - Reservation date
+
+## Adding Products
+
+<Steps>
+  <Step title="Open the Add Product Dialog">
+    Click the **Agregar** button in the main inventory view to open `AgregarMedicamentoView`.
+  </Step>
+  
+  <Step title="Fill in Product Details">
+    Enter the following required fields:
+    - **Nombre**: Product name (text field)
+    - **Existencias**: Stock quantity (spinner, minimum 0)
+    - **Lote**: Batch number (text field)
+    - **Caducidad**: Select year and month from dropdown menus
+  </Step>
+  
+  <Step title="Save the Product">
+    Click **Guardar** to save the product. The system will validate inputs and call the controller method.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public boolean agregarProducto(String nombre, String existencias, String lote, String caducidad)
+```
+
+**Controller**: `InventarioController.java:20-26`  
+**DAO Implementation**: `InventarioDAO.java:103-136`
+
+### Validation Rules
+
+<Warning>
+  All fields are mandatory. The system will show an error if any field is empty.
+</Warning>
+
+<Accordion title="Expiration Date Format">
+  The expiration date must be in `yyyy-MM` format (e.g., `2025-07`). The system uses:
+  - Year dropdown: Current year to +10 years
+  - Month dropdown: 1-12
+  - Automatic validation via regex: `\\d{4}-\\d{2}`
+  - Additional parsing validation with `YearMonth.parse()`
+</Accordion>
+
+<Accordion title="Stock Quantity Rules">
+  - Must be a valid integer
+  - Cannot be negative
+  - Validated in `InventarioDAO.java:114-116`:
+    ```java
+    if (existenciasInt < 0) {
+        JOptionPane.showMessageDialog(null, "Las existencias no pueden ser negativas.", "Error", JOptionPane.ERROR_MESSAGE);
+        return false;
+    }
+    ```
+</Accordion>
+
+### Entry Date
+
+The `fechaEntrada` is automatically set to the current date when adding a product:
+
+```java
+String fechaEntrada = LocalDate.now().toString();
+```
+
+## Editing Products
+
+<Steps>
+  <Step title="Select a Product">
+    Click on a product row in the inventory table to select it.
+  </Step>
+  
+  <Step title="Open Edit Dialog">
+    Click the **Editar** button to open `EditarMedicamentoView` with pre-filled data.
+  </Step>
+  
+  <Step title="Modify Fields">
+    Update any of the following fields:
+    - Nombre
+    - Existencias
+    - Lote
+    - Caducidad (year and month)
+    - Fecha Entrada
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Guardar** to update the product in the database.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public boolean editarProducto(int id, String nombre, String existencias, 
+                              String lote, String caducidad, String fechaEntrada)
+```
+
+**Controller**: `InventarioController.java:36-47`  
+**DAO Implementation**: `InventarioDAO.java:157-195`
+
+<Note>
+  The same validation rules apply to editing as to adding products. Expiration dates must be in `yyyy-MM` format and stock cannot be negative.
+</Note>
+
+## Deleting Products
+
+<Steps>
+  <Step title="Select Product(s)">
+    Click on one or more products in the inventory table. Multiple selection is supported.
+  </Step>
+  
+  <Step title="Click Delete">
+    Click the **Eliminar** button (red color).
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    Confirm the deletion in the dialog box. The system will ask for confirmation before proceeding.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public boolean eliminarProducto(int id)
+```
+
+**Controller**: `InventarioController.java:28-34`  
+**DAO Implementation**: `InventarioDAO.java:142-155`
+
+<Warning>
+  Deleting a product will also delete all associated sales records due to the `ON DELETE CASCADE` foreign key constraint:
+  ```sql
+  FOREIGN KEY (idProducto) REFERENCES productos(id) ON DELETE CASCADE
+  ```
+</Warning>
+
+## Batch Management
+
+### Batch Number Field
+
+The `lote` field stores batch/lot numbers for product tracking:
+- No format restrictions
+- Stored as TEXT in the database
+- Required field when adding or editing products
+
+<Tip>
+  Use a consistent batch numbering scheme (e.g., `BATCH-2025-001`) to make inventory tracking easier.
+</Tip>
+
+## Stock Management
+
+### Automatic Stock Updates
+
+Stock quantities are automatically updated when:
+
+1. **Sales are registered**: Stock decreases by the sold quantity
+   ```java
+   // InventarioDAO.java:281-286
+   String updateQuery = "UPDATE productos SET existencias = existencias - ? WHERE id = ?";
+   ```
+
+2. **Sales are edited**: Stock adjusts based on the difference
+   ```java
+   // InventarioDAO.java:358
+   int diff = nuevaCant - oldQuantity;
+   ```
+
+3. **Sales are deleted**: Stock is NOT automatically restored (manual adjustment required)
+
+### Viewing Current Stock
+
+The main inventory table displays real-time stock levels in the **Existencias** column. This column is sortable (click the header) and uses numeric comparison:
+
+```java
+// InventarioView.java:210-216
+rowSorter.setComparator(2, (o1, o2) -> {
+    try {
+        return Integer.compare(Integer.parseInt(o1.toString()), Integer.parseInt(o2.toString()));
+    } catch (NumberFormatException e) {
+        return 0;
+    }
+});
+```
+
+## Searching and Filtering
+
+### Real-time Search
+
+Use the search bar at the top of the inventory view to filter products:
+- Searches across: Name, Batch, and Expiration date
+- Case-insensitive regex matching
+- Real-time filtering as you type
+
+```java
+// InventarioView.java:227-233
+private void aplicarFiltro(String criterio) {
+    if (criterio.trim().isEmpty()) {
+        rowSorter.setRowFilter(null);
+    } else {
+        rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + criterio));
+    }
+}
+```
+
+### Refresh Table
+
+Click the **Refrescar** button to reload inventory data from the database:
+
+```java
+public void cargarDatos() {
+    model.setRowCount(0);
+    Object[][] productos = controller.obtenerProductos();
+    for (Object[] prod : productos) {
+        model.addRow(prod);
+    }
+}
+```
+
+## Visual Indicators
+
+### Expiration Date Colors
+
+The **Caducidad** column uses color coding to highlight products requiring attention:
+
+- **Red (255, 0, 0)**: Product has already expired
+- **Light Red (255, 153, 153)**: Product expires within 30 days
+- **Normal**: Product has more than 30 days until expiration
+
+```java
+// InventarioView.java:355-363
+if (diasRestantes < 0) {
+    c.setBackground(new Color(255, 0, 0)); // Already expired
+} else if (diasRestantes <= 30) {
+    c.setBackground(new Color(255, 153, 153)); // Expiring soon
+}
+```
+
+### Row Hover Effect
+
+Rows highlight in light blue (220, 240, 255) when hovering with the mouse, improving usability.
+
+## Best Practices
+
+<Tip>
+  **Regular Stock Audits**: Compare physical inventory with system records monthly to catch discrepancies early.
+</Tip>
+
+<Tip>
+  **Consistent Naming**: Use standardized product names to avoid duplicates (e.g., always use "Amoxicilina 500mg" instead of variations).
+</Tip>
+
+<Tip>
+  **Batch Tracking**: Record batch numbers accurately to enable product recalls and quality control.
+</Tip>
+
+<Warning>
+  Always verify expiration dates before adding products. The system accepts future dates up to 10 years ahead.
+</Warning>

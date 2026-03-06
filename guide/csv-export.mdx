@@ -1,0 +1,525 @@
+---
+title: CSV Export
+description: Export inventory, sales, and reservation data to CSV format for analysis and backup
+---
+
+## Overview
+
+The CSV Export feature allows you to export data from all three main modules (Inventory, Sales, and Reservations) to CSV (Comma-Separated Values) format. This enables offline analysis, backup, reporting, and integration with external systems.
+
+## CSV Format
+
+All exports use standard CSV format:
+- **Field Separator**: Comma (`,`)
+- **Header Row**: Column names in the first row
+- **Encoding**: UTF-8
+- **Line Endings**: `\n` (newline)
+- **Extension**: `.csv`
+
+<Note>
+  CSV files can be opened in Microsoft Excel, Google Sheets, LibreOffice Calc, or any spreadsheet application.
+</Note>
+
+## Exporting Inventory Data
+
+### How to Export
+
+<Steps>
+  <Step title="Open Inventory View">
+    Ensure you're in the main inventory view (`InventarioView`).
+  </Step>
+  
+  <Step title="Click Export Button">
+    Click the **Exportar a Excel** button in the bottom button panel.
+  </Step>
+  
+  <Step title="Choose Save Location">
+    Select a directory and filename in the file chooser dialog.
+    - Default filename: `inventario.csv`
+  </Step>
+  
+  <Step title="Confirm Export">
+    Click **Save**. A success message will appear with the file path.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public void exportarInventarioCSV(File fileToSave)
+```
+
+**Controller**: `InventarioController.java:88-90`  
+**DAO Implementation**: `InventarioDAO.java:459-482`
+
+### CSV Output Format
+
+**Header Row:**
+```csv
+ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada
+```
+
+**Example Data:**
+```csv
+ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada
+1,Amoxicilina 500mg,50,BATCH-2025-001,2026-12,2025-03-01
+2,Meloxicam 15mg,30,BATCH-2025-002,2026-08,2025-03-02
+3,Cefalexina 250mg,25,BATCH-2025-003,2027-01,2025-03-03
+```
+
+### Implementation Details
+
+```java
+// InventarioDAO.java:459-482
+public void exportarInventarioCSV(File fileToSave) {
+    try (FileWriter writer = new FileWriter(fileToSave);
+         Statement stmt = this.connection.createStatement();
+         ResultSet rs = stmt.executeQuery("SELECT id, nombre, existencias, lote, caducidad, fechaEntrada FROM productos")) {
+
+        // Write CSV header for inventory
+        writer.append("ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada\n");
+
+        // Iterate over each row and write data
+        while (rs.next()) {
+            writer.append(String.valueOf(rs.getInt("id"))).append(",");
+            writer.append(rs.getString("nombre")).append(",");
+            writer.append(String.valueOf(rs.getInt("existencias"))).append(",");
+            writer.append(rs.getString("lote")).append(",");
+            writer.append(rs.getString("caducidad")).append(",");
+            writer.append(rs.getString("fechaEntrada")).append("\n");
+        }
+        writer.flush();
+        JOptionPane.showMessageDialog(null, "Inventario exportado con éxito en:\n" + fileToSave.getAbsolutePath());
+    } catch (Exception e) {
+        e.printStackTrace();
+        JOptionPane.showMessageDialog(null, "Error al exportar el inventario: " + e.getMessage());
+    }
+}
+```
+
+<Note>
+  The `fecha_separado` field is NOT included in the inventory export. Use the reservations export to see reservation dates.
+</Note>
+
+## Exporting Sales Data
+
+### How to Export
+
+<Steps>
+  <Step title="Open Sales View">
+    Click **Ventas** in the main inventory view to open the sales history.
+  </Step>
+  
+  <Step title="Click Export Button">
+    Click the **Exportar Reporte** button in the sales view.
+  </Step>
+  
+  <Step title="Choose Save Location">
+    Select a directory and filename.
+    - Default filename: `reporte_ventas.csv`
+  </Step>
+  
+  <Step title="Confirm Export">
+    Click **Save**. The file will be created with all visible sales records.
+  </Step>
+</Steps>
+
+### Alternative Export Method
+
+There's also a legacy export method accessible via the controller:
+
+```java
+public void exportarCSV(File fileToSave)
+```
+
+**Controller**: `InventarioController.java:83-85`  
+**DAO Implementation**: `InventarioDAO.java:199-215`
+
+<Warning>
+  The legacy `exportarCSV` method exports a simplified format without product IDs. Use the **Exportar Reporte** button in VentasView for complete data.
+</Warning>
+
+### CSV Output Format (Full Export)
+
+**Header Row:**
+```csv
+ID Venta, ID Producto, Nombre del Medicamento, Cantidad Vendida, Fecha de Venta
+```
+
+**Example Data:**
+```csv
+ID Venta, ID Producto, Nombre del Medicamento, Cantidad Vendida, Fecha de Venta
+1,5,Amoxicilina 500mg,10,2025-03-01
+2,12,Meloxicam 15mg,5,2025-03-02
+3,5,Amoxicilina 500mg,15,2025-03-03
+```
+
+### Implementation (VentasView)
+
+```java
+// VentasView.java:284-307
+private void exportarReporte() {
+    JFileChooser fileChooser = new JFileChooser();
+    fileChooser.setDialogTitle("Guardar Reporte de Ventas");
+    fileChooser.setSelectedFile(new File("reporte_ventas.csv"));
+    int selection = fileChooser.showSaveDialog(this);
+    if (selection == JFileChooser.APPROVE_OPTION) {
+        File file = fileChooser.getSelectedFile();
+        try (java.io.FileWriter writer = new java.io.FileWriter(file)) {
+            writer.append("ID Venta, ID Producto, Nombre del Medicamento, Cantidad Vendida, Fecha de Venta\n");
+            for (int row = 0; row < model.getRowCount(); row++) {
+                for (int col = 0; col < model.getColumnCount(); col++) {
+                    Object value = model.getValueAt(row, col);
+                    writer.append(value != null ? value.toString() : "");
+                    if (col < model.getColumnCount() - 1) writer.append(",");
+                }
+                writer.append("\n");
+            }
+            writer.flush();
+            JOptionPane.showMessageDialog(this, "Reporte exportado con éxito.");
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al exportar el reporte: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+}
+```
+
+<Tip>
+  **Filtered Exports**: The VentasView export includes only the rows currently displayed in the table. Apply filters before exporting to create targeted reports.
+</Tip>
+
+### CSV Output Format (Legacy Export)
+
+**Header Row:**
+```csv
+Nombre, Cantidad Vendida, Fecha de Venta
+```
+
+**Example Data:**
+```csv
+Nombre, Cantidad Vendida, Fecha de Venta
+Amoxicilina 500mg,10,2025-03-01
+Meloxicam 15mg,5,2025-03-02
+```
+
+**Implementation:**
+
+```java
+// InventarioDAO.java:199-215
+public void exportarCSV(File fileToSave) {
+    try (FileWriter writer = new FileWriter(fileToSave);
+         Statement stmt = this.connection.createStatement();
+         ResultSet rs = stmt.executeQuery("SELECT nombre, cantidad, fechaVenta FROM historial_ventas")) {
+        writer.append("Nombre, Cantidad Vendida, Fecha de Venta\n");
+        while (rs.next()) {
+            writer.append(rs.getString("nombre")).append(",");
+            writer.append(String.valueOf(rs.getInt("cantidad"))).append(",");
+            writer.append(rs.getString("fechaVenta") != null ? rs.getString("fechaVenta") : "N/A").append("\n");
+        }
+        writer.flush();
+        JOptionPane.showMessageDialog(null, "CSV exportado con éxito en:\n" + fileToSave.getAbsolutePath());
+    } catch (Exception e) {
+        e.printStackTrace();
+        JOptionPane.showMessageDialog(null, "Error al exportar CSV: " + e.getMessage());
+    }
+}
+```
+
+## Exporting Reservation Data
+
+### How to Export
+
+<Steps>
+  <Step title="Open Reservations View">
+    Click **Apartados** in the main inventory view.
+  </Step>
+  
+  <Step title="Click Export Button">
+    Click the **Exportar a Excel** button in the apartados view.
+  </Step>
+  
+  <Step title="Choose Save Location">
+    Select a directory and filename.
+    - Default filename: `apartados.csv`
+  </Step>
+  
+  <Step title="Confirm Export">
+    Click **Save**. The file will include all reserved products.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public void exportarApartadosCSV(File fileToSave)
+```
+
+**Controller**: `InventarioController.java:115-117`  
+**DAO Implementation**: `InventarioDAO.java:591-612`
+
+### CSV Output Format
+
+**Header Row:**
+```csv
+ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada,Fecha Apartado
+```
+
+**Example Data:**
+```csv
+ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada,Fecha Apartado
+5,Amoxicilina 500mg,20,BATCH-001,2026-12,2025-03-01,2025-03-05
+12,Meloxicam 15mg,15,BATCH-002,2026-08,2025-02-15,2025-03-06
+```
+
+### Implementation Details
+
+```java
+// InventarioDAO.java:591-612
+public void exportarApartadosCSV(File fileToSave) {
+    try (FileWriter writer = new FileWriter(fileToSave);
+         Statement stmt = connection.createStatement();
+         ResultSet rs = stmt.executeQuery(
+             "SELECT id, nombre, existencias, lote, caducidad, fechaEntrada, fecha_separado " +
+             "FROM productos WHERE fecha_separado IS NOT NULL AND fecha_separado <> ''")) {
+
+        writer.append("ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada,Fecha Apartado\n");
+        while (rs.next()) {
+            writer.append(String.valueOf(rs.getInt("id"))).append(",");
+            writer.append(rs.getString("nombre")).append(",");
+            writer.append(String.valueOf(rs.getInt("existencias"))).append(",");
+            writer.append(rs.getString("lote")).append(",");
+            writer.append(rs.getString("caducidad")).append(",");
+            writer.append(rs.getString("fechaEntrada")).append(",");
+            writer.append(rs.getString("fecha_separado")).append("\n");
+        }
+        writer.flush();
+        JOptionPane.showMessageDialog(null, "CSV de Apartados exportado con éxito en:\n" + fileToSave.getAbsolutePath());
+    } catch (Exception e) {
+        e.printStackTrace();
+        JOptionPane.showMessageDialog(null, "Error al exportar CSV de Apartados: " + e.getMessage());
+    }
+}
+```
+
+<Note>
+  Only products with a non-null `fecha_separado` are included in this export.
+</Note>
+
+## Common Use Cases
+
+### Backup and Recovery
+
+<Accordion title="Regular Backups">
+  Export all three datasets weekly to create backup copies:
+  1. Inventory CSV - Complete product database
+  2. Sales CSV - Transaction history
+  3. Reservations CSV - Pending customer orders
+  
+  Store backups in multiple locations (local drive, cloud storage, external drive).
+</Accordion>
+
+### Financial Reporting
+
+<Accordion title="Monthly Sales Reports">
+  1. Open VentasView and filter by date range
+  2. Export filtered results to CSV
+  3. Open in Excel/Sheets
+  4. Use SUM, AVERAGE functions to calculate:
+     - Total units sold
+     - Revenue (if you add pricing)
+     - Top-selling products
+     - Sales trends
+</Accordion>
+
+### Inventory Analysis
+
+<Accordion title="Stock Level Analysis">
+  1. Export inventory CSV
+  2. Sort by Existencias column
+  3. Identify:
+     - Low stock items (reorder needed)
+     - Overstocked items
+     - Stock value by batch
+     - Expiration risk by stock level
+</Accordion>
+
+### Supplier Reports
+
+<Accordion title="Batch Tracking">
+  Export inventory and filter by Lote column to:
+  - Track products from specific suppliers
+  - Prepare quality reports by batch
+  - Manage product recalls
+  - Verify batch rotation (FEFO)
+</Accordion>
+
+## Import into Spreadsheet Applications
+
+### Microsoft Excel
+
+<Steps>
+  <Step title="Open Excel">
+    Launch Microsoft Excel.
+  </Step>
+  
+  <Step title="Open CSV File">
+    File → Open → Select your `.csv` file
+  </Step>
+  
+  <Step title="Verify Encoding">
+    If special characters appear incorrectly, use Data → Get Data → From Text/CSV and select UTF-8 encoding.
+  </Step>
+</Steps>
+
+### Google Sheets
+
+<Steps>
+  <Step title="Open Google Sheets">
+    Go to sheets.google.com
+  </Step>
+  
+  <Step title="Import File">
+    File → Import → Upload → Select your `.csv` file
+  </Step>
+  
+  <Step title="Configure Import">
+    - Import location: New spreadsheet
+    - Separator type: Comma
+    - Convert text to numbers: Yes
+  </Step>
+</Steps>
+
+### LibreOffice Calc
+
+<Steps>
+  <Step title="Open Calc">
+    Launch LibreOffice Calc.
+  </Step>
+  
+  <Step title="Open CSV">
+    File → Open → Select `.csv` file
+  </Step>
+  
+  <Step title="Text Import Dialog">
+    - Character set: UTF-8
+    - Separated by: Comma
+    - Click OK
+  </Step>
+</Steps>
+
+## Error Handling
+
+### Common Issues
+
+<Accordion title="Permission Denied">
+  **Error**: Cannot write to the selected location.
+  
+  **Solutions**:
+  - Choose a different directory (e.g., Desktop or Documents)
+  - Close the file if it's already open in another application
+  - Run the application with appropriate permissions
+</Accordion>
+
+<Accordion title="File Already Exists">
+  **Error**: File already exists.
+  
+  **Solutions**:
+  - The system will overwrite the existing file
+  - Rename the new export to avoid overwriting
+  - Move the old file to a backup location first
+</Accordion>
+
+<Accordion title="Special Characters Display Incorrectly">
+  **Error**: Accented characters (á, é, í, ó, ú, ñ) appear as strange symbols.
+  
+  **Solution**:
+  - When importing, explicitly select UTF-8 encoding
+  - In Excel: Data → Get Data → From Text/CSV → File Origin: UTF-8
+</Accordion>
+
+### Database Connection Errors
+
+```java
+// Error handling in DAO
+catch (Exception e) {
+    e.printStackTrace();
+    JOptionPane.showMessageDialog(null, "Error al exportar: " + e.getMessage());
+}
+```
+
+<Warning>
+  If export fails, check:
+  - Database connection is active
+  - Disk space is sufficient
+  - Write permissions are granted
+</Warning>
+
+## Best Practices
+
+<Tip>
+  **Consistent Naming**: Use a naming convention for exports:
+  - `inventario_2025-03-15.csv`
+  - `ventas_2025-03.csv`
+  - `apartados_2025-Q1.csv`
+</Tip>
+
+<Tip>
+  **Regular Exports**: Schedule weekly exports to maintain backup history and track changes over time.
+</Tip>
+
+<Tip>
+  **Version Control**: Keep multiple versions of exports to track inventory changes and detect data entry errors.
+</Tip>
+
+<Tip>
+  **Filtered Exports**: Use table filters before exporting sales data to create targeted reports (e.g., sales by product, sales by date range).
+</Tip>
+
+<Warning>
+  **Data Security**: CSV files contain sensitive business data. Store them securely and limit access appropriately.
+</Warning>
+
+## Advanced CSV Processing
+
+### Automating with Scripts
+
+CSV files can be processed with Python, R, or other data analysis tools:
+
+```python
+import pandas as pd
+
+# Read inventory CSV
+df = pd.read_csv('inventario.csv')
+
+# Filter products expiring in 2025-06
+expiring_soon = df[df['Caducidad'] == '2025-06']
+
+# Calculate total stock value (if price data available)
+total_units = df['Existencias'].sum()
+
+print(f"Total units in stock: {total_units}")
+print(f"Products expiring in June 2025: {len(expiring_soon)}")
+```
+
+### Database Import
+
+Import CSV data into other database systems:
+
+```sql
+-- PostgreSQL example
+COPY productos(id, nombre, existencias, lote, caducidad, fechaEntrada)
+FROM '/path/to/inventario.csv'
+DELIMITER ','
+CSV HEADER;
+```
+
+### Business Intelligence Tools
+
+Import CSV files into BI tools:
+- **Tableau**: Connect to CSV file as data source
+- **Power BI**: Get Data → Text/CSV
+- **Looker Studio**: Upload CSV as data source
+
+<Tip>
+  Create dashboards by regularly exporting data and loading it into BI tools for visualization and trend analysis.
+</Tip>

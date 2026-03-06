@@ -1,0 +1,446 @@
+---
+title: Expiration Monitoring
+description: Track and manage products nearing expiration with automated alerts
+---
+
+## Overview
+
+The Expiration Monitoring system helps prevent medication waste and ensure patient safety by tracking products approaching their expiration dates. The system uses visual indicators, automatic alerts, and dedicated views to manage expiring inventory.
+
+## Expiration Date Format
+
+All expiration dates are stored in **year-month** format:
+
+- **Format**: `yyyy-MM` (e.g., `2025-07` for July 2025)
+- **Database Field**: `caducidad` (TEXT)
+- **Validation**: Regex pattern `\\d{4}-\\d{2}` and `YearMonth.parse()`
+
+### Why Year-Month Format?
+
+Pharmaceutical products typically expire at the end of a month, not on a specific day. This format:
+- Matches industry standards
+- Simplifies data entry
+- Reduces errors from day-specific dates
+
+```java
+// InventarioDAO.java:217-230
+private boolean validarFechaCaducidad(String fechaCaducidad) {
+    // Validate with regex: 4 digits for year, hyphen, 2 digits for month
+    if (!fechaCaducidad.matches("\\d{4}-\\d{2}")) {
+        return false;
+    }
+    // Additionally try parsing with YearMonth
+    try {
+        DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        YearMonth.parse(fechaCaducidad, ymFormatter);
+        return true; // Valid if it parses
+    } catch (DateTimeParseException e) {
+        return false;
+    }
+}
+```
+
+<Note>
+  The system treats the expiration as the **first day** of the specified month when calculating days remaining.
+</Note>
+
+## Expiration Calculation Logic
+
+### Days Until Expiration
+
+The system calculates remaining days using the first day of the expiration month:
+
+```java
+// InventarioDAO.java:491-501
+DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+LocalDate hoy = LocalDate.now();
+
+while (rs.next()) {
+    String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
+    YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
+    
+    // Take the first day of that month to calculate remaining days
+    LocalDate primerDiaCaducidad = cadYM.atDay(1);
+    long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
+}
+```
+
+### Expiration Status
+
+- **Expired**: `diasRestantes < 0` (first day of expiration month has passed)
+- **Expiring Soon**: `0 <= diasRestantes <= 30` (within 30 days of expiration month)
+- **Safe**: `diasRestantes > 30` (more than 30 days until expiration)
+
+## Visual Indicators
+
+### Color-Coded Expiration Column
+
+The **Caducidad** column uses background colors to highlight expiration status:
+
+<Accordion title="Color Coding System">
+  - **Bright Red (255, 0, 0)**: Product has already expired
+  - **Light Red (255, 153, 153)**: Product expires within 30 days
+  - **Normal Background**: Product has more than 30 days remaining
+</Accordion>
+
+### Implementation
+
+```java
+// InventarioView.java:346-367 (HoverTableCellRenderer)
+if (column == 4 && value != null) {
+    try {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        YearMonth cadYM = YearMonth.parse(value.toString(), formatter);
+        LocalDate primerDiaCaducidad = cadYM.atDay(1);
+        LocalDate hoy = LocalDate.now();
+        long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
+
+        if (diasRestantes < 0) {
+            c.setBackground(new Color(255, 0, 0)); // Bright red (already expired)
+        } else if (diasRestantes <= 30) {
+            c.setBackground(new Color(255, 153, 153)); // Light red (expiring soon)
+        } else {
+            c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
+        }
+    } catch (DateTimeParseException e) {
+        c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
+    }
+}
+```
+
+<Note>
+  The same color coding applies in both the main inventory view and the reservations (apartados) view.
+</Note>
+
+## Startup Alert
+
+### Automatic Notification
+
+When the inventory view opens, an automatic alert displays if any products are expiring or expired:
+
+```java
+// InventarioView.java:161-172
+SwingUtilities.invokeLater(() -> {
+    List<Object[]> proximos = controller.obtenerMedicamentosProximosACaducar(30);
+    List<Object[]> caducados = controller.obtenerMedicamentosCaducados();
+    if (!proximos.isEmpty() || !caducados.isEmpty()) {
+        JOptionPane.showMessageDialog(frame,
+                "Medicamentos próximos a caducar: " + proximos.size() + "\n" +
+                        "Medicamentos ya caducados: " + caducados.size(),
+                "Alerta de Caducidad",
+                JOptionPane.WARNING_MESSAGE
+        );
+    }
+});
+```
+
+<Warning>
+  This alert shows immediately after the main window loads, ensuring you never miss expiration warnings.
+</Warning>
+
+## Checking Products Nearing Expiration
+
+### Method Signature
+
+```java
+public List<Object[]> obtenerMedicamentosProximosACaducar(int diasUmbral)
+```
+
+**Controller**: `InventarioController.java:94-96`  
+**DAO Implementation**: `InventarioDAO.java:486-516`
+
+### Parameters
+
+- **diasUmbral**: Threshold in days (default: 30)
+- Returns products with `0 <= diasRestantes <= diasUmbral`
+
+### Implementation
+
+```java
+// InventarioDAO.java:486-516
+public List<Object[]> obtenerMedicamentosProximosACaducar(int diasUmbral) {
+    List<Object[]> proximos = new ArrayList<>();
+    try (Statement stmt = connection.createStatement();
+         ResultSet rs = stmt.executeQuery("SELECT * FROM productos")) {
+
+        DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        LocalDate hoy = LocalDate.now();
+
+        while (rs.next()) {
+            String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
+            YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
+            LocalDate primerDiaCaducidad = cadYM.atDay(1);
+            long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
+
+            if (diasRestantes >= 0 && diasRestantes <= diasUmbral) {
+                int id = rs.getInt("id");
+                String nombre = rs.getString("nombre");
+                int existencias = rs.getInt("existencias");
+                String lote = rs.getString("lote");
+                String fechaEntrada = rs.getString("fechaEntrada");
+                proximos.add(new Object[]{id, nombre, existencias, lote, caducidadStr, fechaEntrada});
+            }
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return proximos;
+}
+```
+
+<Tip>
+  Adjust the `diasUmbral` parameter to customize the warning period. For example, use 60 days for products with longer lead times.
+</Tip>
+
+## Checking Expired Products
+
+### Method Signature
+
+```java
+public List<Object[]> obtenerMedicamentosCaducados()
+```
+
+**Controller**: `InventarioController.java:98-100`  
+**DAO Implementation**: `InventarioDAO.java:521-547`
+
+### Implementation
+
+```java
+// InventarioDAO.java:521-547
+public List<Object[]> obtenerMedicamentosCaducados() {
+    List<Object[]> caducados = new ArrayList<>();
+    try (Statement stmt = connection.createStatement();
+         ResultSet rs = stmt.executeQuery("SELECT * FROM productos")) {
+
+        DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        LocalDate hoy = LocalDate.now();
+
+        while (rs.next()) {
+            String caducidadStr = rs.getString("caducidad"); // "yyyy-MM"
+            YearMonth cadYM = YearMonth.parse(caducidadStr, ymFormatter);
+            LocalDate primerDiaCaducidad = cadYM.atDay(1);
+
+            if (primerDiaCaducidad.isBefore(hoy)) {
+                int id = rs.getInt("id");
+                String nombre = rs.getString("nombre");
+                int existencias = rs.getInt("existencias");
+                String lote = rs.getString("lote");
+                String fechaEntrada = rs.getString("fechaEntrada");
+                caducados.add(new Object[]{id, nombre, existencias, lote, caducidadStr, fechaEntrada});
+            }
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return caducados;
+}
+```
+
+<Warning>
+  Expired products appear with bright red highlighting in the inventory table. Remove or dispose of them according to regulations.
+</Warning>
+
+## Handling Expired Products
+
+### Recommended Workflow
+
+<Steps>
+  <Step title="Identify Expired Products">
+    Scan the inventory table for rows with bright red in the Caducidad column, or check the startup alert count.
+  </Step>
+  
+  <Step title="Verify Physical Inventory">
+    Confirm that expired products are still in stock and need disposal.
+  </Step>
+  
+  <Step title="Document Disposal">
+    Before deleting from the system:
+    - Export inventory to CSV for records
+    - Note batch numbers and quantities
+    - Follow pharmaceutical disposal regulations
+  </Step>
+  
+  <Step title="Remove from System">
+    Select expired products and click **Eliminar** to delete them from inventory.
+  </Step>
+</Steps>
+
+<Warning>
+  **Regulatory Compliance**: Keep records of expired product disposal for regulatory audits. Always export data before deletion.
+</Warning>
+
+## Handling Products Expiring Soon
+
+### Priority Sales Strategy
+
+<Tip>
+  Implement a First-Expiry-First-Out (FEFO) inventory system:
+  1. Sort products by expiration date (click Caducidad column header)
+  2. Sell products with light red highlighting first
+  3. Reserve longer-expiry products for future sales
+</Tip>
+
+### Discount Strategy
+
+<Accordion title="Products Within 30 Days of Expiration">
+  Consider:
+  - Offering discounts to move inventory faster
+  - Notifying regular customers of upcoming expirations
+  - Reducing order quantities for slow-moving products
+</Accordion>
+
+### Return to Supplier
+
+<Accordion title="Products Within 60-90 Days">
+  Some suppliers accept returns of products approaching expiration. Check:
+  - Supplier return policies
+  - Minimum notice periods
+  - Batch number requirements
+</Accordion>
+
+## Expiration Monitoring Best Practices
+
+<Tip>
+  **Weekly Reviews**: Every Monday, check the Caducidad column for new yellow/red entries.
+</Tip>
+
+<Tip>
+  **Batch Rotation**: When receiving new inventory, place new batches behind older ones on shelves (FEFO principle).
+</Tip>
+
+<Tip>
+  **Adjust Order Quantities**: If products frequently expire, reduce order sizes or frequency for those items.
+</Tip>
+
+<Tip>
+  **Customer Communication**: Inform customers when dispensing products with less than 90 days until expiration.
+</Tip>
+
+<Warning>
+  Never sell expired products. Besides being illegal, it endangers animal health and damages your reputation.
+</Warning>
+
+## Integration with Reservations
+
+### Checking Reserved Product Expirations
+
+The Apartados view also highlights expiration dates:
+
+```java
+// ApartadosView.java:299-317 (HoverTableCellRenderer)
+if (column == 4 && value != null) {
+    try {
+        DateTimeFormatter ymFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        YearMonth cadYM = YearMonth.parse(value.toString(), ymFormatter);
+        LocalDate primerDiaCaducidad = cadYM.atDay(1);
+        LocalDate hoy = LocalDate.now();
+        long diasRestantes = ChronoUnit.DAYS.between(hoy, primerDiaCaducidad);
+
+        if (diasRestantes < 0) {
+            c.setBackground(new Color(255, 0, 0)); // Bright red (already expired)
+        } else if (diasRestantes <= 30) {
+            c.setBackground(new Color(255, 153, 153)); // Light red (expiring soon)
+        }
+    } catch (Exception e) {
+        c.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
+    }
+}
+```
+
+<Warning>
+  Check reserved products regularly. Contact customers to pick up reservations before products expire.
+</Warning>
+
+## Advanced Monitoring Techniques
+
+### Custom Threshold Periods
+
+Modify the threshold for different product types:
+
+```java
+// Example: Check products expiring in 60 days
+List<Object[]> proximos60 = controller.obtenerMedicamentosProximosACaducar(60);
+```
+
+<Tip>
+  Use longer thresholds (60-90 days) for:
+  - Expensive medications
+  - Slow-moving inventory
+  - Products with limited suppliers
+</Tip>
+
+### Expiration Reports
+
+<Steps>
+  <Step title="Export Inventory">
+    Click **Exportar a Excel** to save inventory data.
+  </Step>
+  
+  <Step title="Open in Spreadsheet">
+    Open the CSV file in Excel or Google Sheets.
+  </Step>
+  
+  <Step title="Filter by Expiration">
+    Sort by the Caducidad column to group products by expiration month.
+  </Step>
+  
+  <Step title="Analyze Patterns">
+    Identify:
+    - Products that frequently expire
+    - Seasonal expiration patterns
+    - Inventory turnover issues
+  </Step>
+</Steps>
+
+## Validation During Data Entry
+
+### Adding Products
+
+The system validates expiration dates when adding products:
+
+```java
+// InventarioDAO.java:104-110
+if (!validarFechaCaducidad(caducidad)) {
+    JOptionPane.showMessageDialog(null,
+            "La fecha de caducidad debe tener el formato yyyy-MM (ej. 2025-07).",
+            "Error", JOptionPane.ERROR_MESSAGE);
+    return false;
+}
+```
+
+### Editing Products
+
+The same validation applies when editing:
+
+```java
+// InventarioDAO.java:165-170
+if (!validarFechaCaducidad(caducidad)) {
+    JOptionPane.showMessageDialog(null,
+            "La fecha de caducidad debe ser yyyy-MM.",
+            "Error", JOptionPane.ERROR_MESSAGE);
+    return false;
+}
+```
+
+<Note>
+  The system prevents invalid dates at entry, ensuring data integrity for expiration monitoring.
+</Note>
+
+## Performance Considerations
+
+### Database Queries
+
+Expiration checks query all products:
+
+```sql
+SELECT * FROM productos
+```
+
+Then filter in Java code. This approach:
+- Works well for small to medium inventories (< 10,000 products)
+- Allows flexible date calculations
+- Avoids complex SQLite date functions
+
+<Tip>
+  For very large inventories, consider adding an index on the `caducidad` column to improve query performance.
+</Tip>

@@ -1,0 +1,433 @@
+---
+title: Product Reservation
+description: Set aside products for customers with the apartados (reservation) system
+---
+
+## Overview
+
+The Product Reservation (Apartados) system allows you to mark products as reserved for specific customers. Reserved products remain in inventory but are visually separated to prevent accidental sale to other customers.
+
+## How Reservations Work
+
+### Database Field
+
+Reservations use the `fecha_separado` field in the `productos` table:
+- **NULL or Empty**: Product is available
+- **Date value (yyyy-MM-dd)**: Product is reserved from this date
+
+```sql
+-- From table schema
+fecha_separado TEXT  -- Can be NULL
+```
+
+### Reservation Logic
+
+Products with a non-null `fecha_separado` are considered reserved:
+
+```sql
+SELECT * FROM productos 
+WHERE fecha_separado IS NOT NULL AND fecha_separado <> ''
+```
+
+**DAO Implementation**: `InventarioDAO.java:571-587`
+
+<Note>
+  Reservations do NOT reduce available inventory. The stock quantity remains unchanged, allowing you to track both reserved and available inventory.
+</Note>
+
+## Creating Reservations
+
+<Steps>
+  <Step title="Open Reservations View">
+    Click the **Apartados** button in the main inventory view to open `ApartadosView`.
+  </Step>
+  
+  <Step title="Register New Reservation">
+    Click **Registrar Apartado** to open the registration dialog.
+  </Step>
+  
+  <Step title="Enter Product Information">
+    Fill in:
+    - **Nombre o ID del Producto**: Enter either the product ID (number) or product name (text)
+    - **Fecha de Apartado**: Select reservation date using the date picker (format: yyyy-MM-dd)
+  </Step>
+  
+  <Step title="Save Reservation">
+    Click **Guardar** to mark the product as reserved.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public boolean separarProducto(int id, String fechaSeparado)
+```
+
+**Controller**: `InventarioController.java:103-109`  
+**DAO Implementation**: `InventarioDAO.java:553-567`
+
+### Implementation Details
+
+```java
+// InventarioDAO.java:553-567
+public boolean separarProducto(int id, String fechaSeparado) {
+    try {
+        ensureConnection();
+        String sql = "UPDATE productos SET fecha_separado = ? WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, fechaSeparado);
+            pstmt.setInt(2, id);
+            int filasAfectadas = pstmt.executeUpdate();
+            return filasAfectadas > 0;
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+        return false;
+    }
+}
+```
+
+### Product Lookup Logic
+
+The system intelligently determines whether you entered an ID or name:
+
+```java
+// RegistrarApartadoView.java:107-113
+int id = -1;
+try {
+    // If the field is numeric, interpret as ID
+    id = Integer.parseInt(search);
+} catch (NumberFormatException e) {
+    // If not numeric, search product by name
+    id = controller.obtenerProductoIdPorNombre(search);
+}
+```
+
+### Name-Based Lookup
+
+```java
+public int obtenerProductoIdPorNombre(String nombre)
+```
+
+**Controller**: `InventarioController.java:119-121`  
+**DAO Implementation**: `InventarioDAO.java:615-630`
+
+```java
+// InventarioDAO.java:615-630
+public int obtenerProductoIdPorNombre(String nombre) {
+    try {
+        ensureConnection();
+        String sql = "SELECT id FROM productos WHERE nombre = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, nombre);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("id");
+            }
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return -1; // Returns -1 if product not found
+}
+```
+
+<Warning>
+  Name matching is case-sensitive and must be exact. Use the product ID for more reliable results.
+</Warning>
+
+## Viewing Reserved Products
+
+### Reservations Table
+
+The reservations view displays all reserved products with these columns:
+
+1. **ID** - Product ID
+2. **Nombre** - Product name
+3. **Existencias** - Stock quantity
+4. **Lote** - Batch number
+5. **Caducidad** - Expiration date (yyyy-MM format)
+6. **Fecha Entrada** - Entry date
+7. **Fecha Apartado** - Reservation date
+
+### Method to Retrieve Reservations
+
+```java
+public List<Object[]> obtenerProductosApartados()
+```
+
+**Controller**: `InventarioController.java:111-113`  
+**DAO Implementation**: `InventarioDAO.java:571-587`
+
+### Expiration Date Highlighting
+
+Reserved products also display expiration warnings:
+
+- **Red (255, 0, 0)**: Already expired
+- **Light Red (255, 153, 153)**: Expires within 30 days
+
+```java
+// ApartadosView.java:309-312
+if (diasRestantes < 0) {
+    c.setBackground(new Color(255, 0, 0)); // Expired
+} else if (diasRestantes <= 30) {
+    c.setBackground(new Color(255, 153, 153)); // Expiring soon
+}
+```
+
+<Tip>
+  Check reserved products regularly for expiration dates to prevent reserving products that will expire soon.
+</Tip>
+
+## Editing Reservations
+
+<Steps>
+  <Step title="Select Reservation">
+    Click on a reserved product in the apartados table.
+  </Step>
+  
+  <Step title="Open Edit Dialog">
+    Click **Editar Apartado** to open `EditarApartadoView`.
+  </Step>
+  
+  <Step title="Update Reservation Date">
+    Select a new reservation date using the date picker.
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Guardar** to update the reservation date.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public boolean editarApartado(int id, String nuevaFechaApartado)
+```
+
+**Controller**: `InventarioController.java:133-139`  
+**DAO Implementation**: `InventarioDAO.java:650-664`
+
+```java
+// InventarioDAO.java:650-664
+public boolean editarApartado(int id, String nuevaFechaApartado) {
+    try {
+        ensureConnection();
+        String sql = "UPDATE productos SET fecha_separado = ? WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, nuevaFechaApartado);
+            pstmt.setInt(2, id);
+            int affected = pstmt.executeUpdate();
+            return affected > 0;
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+        return false;
+    }
+}
+```
+
+<Note>
+  You can only edit the reservation date. To change the reserved product, you must release the current reservation and create a new one.
+</Note>
+
+## Releasing Reservations
+
+<Steps>
+  <Step title="Select Reservation(s)">
+    Click on one or more reserved products. Multiple selection is supported.
+  </Step>
+  
+  <Step title="Click Delete">
+    Click the **Eliminar** button (red color) to release the reservation.
+  </Step>
+  
+  <Step title="Confirm Release">
+    Confirm the action in the dialog box.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public boolean eliminarApartado(int id)
+```
+
+**Controller**: `InventarioController.java:125-131`  
+**DAO Implementation**: `InventarioDAO.java:633-646`
+
+### Implementation
+
+Releasing a reservation sets `fecha_separado` back to NULL:
+
+```java
+// InventarioDAO.java:633-646
+public boolean eliminarApartado(int id) {
+    try {
+        ensureConnection();
+        String sql = "UPDATE productos SET fecha_separado = NULL WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            int affected = pstmt.executeUpdate();
+            return affected > 0;
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+        return false;
+    }
+}
+```
+
+<Note>
+  Releasing a reservation makes the product available again in the main inventory. Stock quantities are not affected.
+</Note>
+
+## Exporting Reservations
+
+### CSV Export
+
+Export all reserved products to CSV format:
+
+<Steps>
+  <Step title="Open Export Dialog">
+    Click **Exportar a Excel** in the reservations view.
+  </Step>
+  
+  <Step title="Choose Location">
+    Select a save location. Default filename: `apartados.csv`
+  </Step>
+  
+  <Step title="Confirm Export">
+    The file will be created with all reserved products.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public void exportarApartadosCSV(File fileToSave)
+```
+
+**Controller**: `InventarioController.java:115-117`  
+**DAO Implementation**: `InventarioDAO.java:591-612`
+
+### CSV Format
+
+```csv
+ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada,Fecha Apartado
+5,Amoxicilina 500mg,20,BATCH-001,2026-12,2025-03-01,2025-03-05
+12,Meloxicam 15mg,15,BATCH-002,2026-08,2025-02-15,2025-03-06
+```
+
+### Implementation
+
+```java
+// InventarioDAO.java:591-612
+public void exportarApartadosCSV(File fileToSave) {
+    try (FileWriter writer = new FileWriter(fileToSave);
+         Statement stmt = connection.createStatement();
+         ResultSet rs = stmt.executeQuery(
+             "SELECT id, nombre, existencias, lote, caducidad, fechaEntrada, fecha_separado " +
+             "FROM productos WHERE fecha_separado IS NOT NULL AND fecha_separado <> ''")) {
+
+        writer.append("ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada,Fecha Apartado\n");
+        while (rs.next()) {
+            writer.append(String.valueOf(rs.getInt("id"))).append(",");
+            writer.append(rs.getString("nombre")).append(",");
+            writer.append(String.valueOf(rs.getInt("existencias"))).append(",");
+            writer.append(rs.getString("lote")).append(",");
+            writer.append(rs.getString("caducidad")).append(",");
+            writer.append(rs.getString("fechaEntrada")).append(",");
+            writer.append(rs.getString("fecha_separado")).append("\n");
+        }
+        writer.flush();
+        JOptionPane.showMessageDialog(null, "CSV de Apartados exportado con éxito en:\n" + fileToSave.getAbsolutePath());
+    } catch (Exception e) {
+        e.printStackTrace();
+        JOptionPane.showMessageDialog(null, "Error al exportar CSV de Apartados: " + e.getMessage());
+    }
+}
+```
+
+<Tip>
+  Export reservations weekly to maintain records of customer orders and follow up on long-standing reservations.
+</Tip>
+
+## Reservation Date Format
+
+Reservation dates use the standard date format:
+
+- **Format**: `yyyy-MM-dd` (e.g., 2025-03-15)
+- **Date Picker**: `JDateChooser` with automatic formatting
+- **Storage**: TEXT field in SQLite database
+
+```java
+// RegistrarApartadoView.java:104
+String fechaApartado = new SimpleDateFormat("yyyy-MM-dd").format(date);
+```
+
+## Inventory View Integration
+
+### Refreshing Main Inventory
+
+When you create or release a reservation, the main inventory view automatically refreshes:
+
+```java
+// InventarioController.java:103-109
+public boolean separarProducto(int id, String fechaSeparado) {
+    boolean result = dao.separarProducto(id, fechaSeparado);
+    if (result && inventarioView != null) {
+        inventarioView.cargarDatos();  // Refresh main view
+    }
+    return result;
+}
+```
+
+<Note>
+  Reserved products remain visible in the main inventory view. The `fecha_separado` column is not displayed there, so use the Apartados view to see reservation details.
+</Note>
+
+## Use Cases
+
+<Accordion title="Customer Orders">
+  When a customer orders a product but will pick it up later:
+  1. Create a reservation with the pickup date
+  2. The product stays in inventory but is marked reserved
+  3. Release the reservation when the customer picks up the product
+</Accordion>
+
+<Accordion title="Prescription Preparations">
+  For veterinary prescriptions being prepared:
+  1. Reserve the products needed for the prescription
+  2. Set the reservation date to the expected completion date
+  3. Process the sale when the prescription is ready
+</Accordion>
+
+<Accordion title="Seasonal Demand">
+  During high-demand seasons:
+  1. Reserve products for regular customers
+  2. Prevent stock-outs for priority clients
+  3. Track reservation duration to optimize inventory
+</Accordion>
+
+## Best Practices
+
+<Tip>
+  **Use Product IDs**: When possible, use product IDs instead of names for faster, more accurate lookups.
+</Tip>
+
+<Tip>
+  **Regular Reviews**: Check the reservations view daily to follow up on pending customer pickups.
+</Tip>
+
+<Tip>
+  **Set Realistic Dates**: Use the reservation date to indicate when the customer will pick up the product, not when you created the reservation.
+</Tip>
+
+<Warning>
+  Reservations do not prevent the product from being sold. Train staff to check the Apartados view before selling products.
+</Warning>
+
+<Tip>
+  **Track Long Reservations**: If a product has been reserved for more than 7 days, contact the customer to confirm they still need it.
+</Tip>

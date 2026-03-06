@@ -1,0 +1,407 @@
+---
+title: Sales Tracking
+description: Record and manage product sales with automatic inventory updates
+---
+
+## Overview
+
+The Sales Tracking module enables you to register product sales, maintain a complete sales history, and automatically update inventory levels. All sales data is stored in the `historial_ventas` table.
+
+## Database Schema
+
+Sales records are stored with the following fields:
+
+- `id` (INTEGER, PRIMARY KEY, AUTOINCREMENT) - Sale record ID
+- `idProducto` (INTEGER, FOREIGN KEY) - References `productos(id)`
+- `nombre` (TEXT) - Product name at time of sale
+- `cantidad` (INTEGER) - Quantity sold
+- `fechaVenta` (TEXT) - Sale date in `yyyy-MM-dd` format
+
+```sql
+CREATE TABLE IF NOT EXISTS historial_ventas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    idProducto INTEGER,
+    nombre TEXT,
+    cantidad INTEGER,
+    fechaVenta TEXT,
+    FOREIGN KEY (idProducto) REFERENCES productos(id) ON DELETE CASCADE
+)
+```
+
+## Registering Sales
+
+<Steps>
+  <Step title="Open Sales View">
+    Click the **Ventas** button in the main inventory view to open `VentasView`.
+  </Step>
+  
+  <Step title="Add New Sale">
+    Click **Agregar Venta** to open the registration dialog (`RegistrarVentaView`).
+  </Step>
+  
+  <Step title="Enter Sale Details">
+    Fill in the required fields:
+    - **ID del Medicamento**: Product ID (must exist in inventory)
+    - **Nombre del Medicamento**: Product name (must match registered name)
+    - **Cantidad Vendida**: Quantity sold (spinner, minimum 1)
+  </Step>
+  
+  <Step title="Save the Sale">
+    Click **Guardar**. The system will validate inputs and update inventory automatically.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public boolean registrarVenta(int id, String nombre, int cantidad)
+```
+
+**Controller**: `InventarioController.java:50-56`  
+**DAO Implementation**: `InventarioDAO.java:247-309`
+
+### Validation Rules
+
+<Accordion title="Product ID Validation">
+  The system verifies that the product ID exists in the inventory:
+  ```java
+  String selectQuery = "SELECT nombre, existencias FROM productos WHERE id = ?";
+  if (!rs.next()) {
+      JOptionPane.showMessageDialog(null, "El producto con ID " + id + " no existe.", 
+                                    "Error", JOptionPane.ERROR_MESSAGE);
+      return false;
+  }
+  ```
+</Accordion>
+
+<Accordion title="Name Matching Validation">
+  The entered name must match the registered product name (case-insensitive):
+  ```java
+  // InventarioDAO.java:267-270
+  if (!nombreReal.equalsIgnoreCase(nombreIngresado)) {
+      JOptionPane.showMessageDialog(null, 
+          "El nombre ingresado no coincide con el producto registrado para el ID " + id + ".", 
+          "Error", JOptionPane.ERROR_MESSAGE);
+      return false;
+  }
+  ```
+  This validation prevents accidental sales to wrong products.
+</Accordion>
+
+<Accordion title="Stock Availability Check">
+  The system ensures sufficient stock before completing the sale:
+  ```java
+  // InventarioDAO.java:272-275
+  if (cantidadVendida > existenciasActuales) {
+      JOptionPane.showMessageDialog(null, "No hay suficientes existencias.", 
+                                    "Error", JOptionPane.ERROR_MESSAGE);
+      return false;
+  }
+  ```
+</Accordion>
+
+<Accordion title="Quantity Validation">
+  - Quantity must be greater than 0
+  - Validated in `RegistrarVentaView.java:119-122`:
+    ```java
+    if (cantidad <= 0) {
+        JOptionPane.showMessageDialog(this, "La cantidad debe ser mayor a cero.", 
+                                      "Error", JOptionPane.ERROR_MESSAGE);
+        return false;
+    }
+    ```
+</Accordion>
+
+## Automatic Inventory Updates
+
+### Transaction-Based Updates
+
+Sales registration uses database transactions to ensure data consistency:
+
+```java
+// InventarioDAO.java:278-299
+connection.setAutoCommit(false);
+
+// Decrease inventory stock
+String updateQuery = "UPDATE productos SET existencias = existencias - ? WHERE id = ?";
+try (PreparedStatement updateStmt = connection.prepareStatement(updateQuery)) {
+    updateStmt.setInt(1, cantidadVendida);
+    updateStmt.setInt(2, id);
+    updateStmt.executeUpdate();
+}
+
+// Register sale in history
+String fechaVenta = LocalDate.now().toString();
+String insertHistorial = "INSERT INTO historial_ventas (idProducto, nombre, cantidad, fechaVenta) VALUES (?, ?, ?, ?)";
+try (PreparedStatement insertStmt = connection.prepareStatement(insertHistorial)) {
+    insertStmt.setInt(1, id);
+    insertStmt.setString(2, nombreReal);
+    insertStmt.setInt(3, cantidadVendida);
+    insertStmt.setString(4, fechaVenta);
+    insertStmt.executeUpdate();
+}
+
+connection.commit();
+```
+
+<Note>
+  If any step fails, the entire transaction is rolled back, preventing inventory inconsistencies.
+</Note>
+
+### Automatic Date Stamping
+
+Sale dates are automatically set to the current date:
+
+```java
+String fechaVenta = LocalDate.now().toString(); // Format: yyyy-MM-dd
+```
+
+## Viewing Sales History
+
+### Sales Table Columns
+
+The sales history table displays:
+
+1. **ID Venta** - Sale record ID
+2. **ID Producto** - Product ID reference
+3. **Nombre del Medicamento** - Product name
+4. **Cantidad Vendida** - Quantity sold
+5. **Fecha de Venta** - Sale date
+
+### Method to Retrieve Sales
+
+```java
+public List<Object[]> obtenerHistorialVentas()
+```
+
+**Controller**: `InventarioController.java:79-81`  
+**DAO Implementation**: `InventarioDAO.java:426-451`
+
+```java
+SELECT id, idProducto, nombre, cantidad, fechaVenta 
+FROM historial_ventas 
+ORDER BY id ASC
+```
+
+## Editing Sales Records
+
+<Steps>
+  <Step title="Select a Sale">
+    Click on a sale record in the sales history table.
+  </Step>
+  
+  <Step title="Open Edit Dialog">
+    Click **Editar Venta** to open `EditarVentaView`.
+  </Step>
+  
+  <Step title="Modify Details">
+    Update:
+    - Product name (must still match the original product)
+    - Quantity sold
+    - Sale date
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Guardar**. The system will recalculate inventory based on the quantity difference.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public boolean editarVenta(Object id, String nuevoNombre, String nuevaCantidad, String nuevaFecha)
+```
+
+**Controller**: `InventarioController.java:62-68`  
+**DAO Implementation**: `InventarioDAO.java:316-407`
+
+### Stock Adjustment Logic
+
+When editing a sale, the system calculates the quantity difference and adjusts inventory:
+
+```java
+// InventarioDAO.java:358
+int diff = nuevaCant - oldQuantity;
+
+// If increasing the sale quantity, verify sufficient stock
+if (diff > 0) {
+    String selectStock = "SELECT existencias FROM productos WHERE id = ?";
+    try (PreparedStatement psStock = connection.prepareStatement(selectStock)) {
+        psStock.setInt(1, idProducto);
+        try (ResultSet rs = psStock.executeQuery()) {
+            if (rs.next()) {
+                int stock = rs.getInt("existencias");
+                if (stock < diff) {
+                    JOptionPane.showMessageDialog(null, 
+                        "No hay suficientes existencias para aumentar la venta.", 
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                    return false;
+                }
+            }
+        }
+    }
+}
+
+// Update stock
+String updateStock = "UPDATE productos SET existencias = existencias - ? WHERE id = ?";
+```
+
+<Warning>
+  The product name must still match the original product associated with the sale. This prevents accidentally reassigning sales to different products.
+</Warning>
+
+## Deleting Sales Records
+
+<Steps>
+  <Step title="Select Sale(s)">
+    Click on one or more sales records. Multiple selection is supported.
+  </Step>
+  
+  <Step title="Click Delete">
+    Click the **Eliminar** button (red color).
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    Confirm the deletion in the dialog box.
+  </Step>
+</Steps>
+
+### Method Signature
+
+```java
+public boolean eliminarVenta(Object id)
+```
+
+**Controller**: `InventarioController.java:71-73`  
+**DAO Implementation**: `InventarioDAO.java:412-424`
+
+<Warning>
+  **Important**: Deleting a sale record does NOT restore the inventory stock. You must manually adjust inventory if needed.
+</Warning>
+
+## Filtering Sales Data
+
+### Advanced Filtering
+
+The sales view includes a powerful filtering system:
+
+<Steps>
+  <Step title="Select Filter Column">
+    Choose from the dropdown:
+    - ID Venta
+    - ID Producto
+    - Nombre
+    - Cantidad
+    - Fecha
+  </Step>
+  
+  <Step title="Enter Filter Text">
+    Type in the filter field. Results update in real-time.
+  </Step>
+</Steps>
+
+```java
+// VentasView.java:193-201
+private void aplicarFiltroAvanzado() {
+    String texto = txtFiltrar.getText().trim();
+    int columnIndex = cmbFiltro.getSelectedIndex();
+    if (texto.isEmpty()) {
+        rowSorter.setRowFilter(null);
+    } else {
+        rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + texto, columnIndex));
+    }
+}
+```
+
+<Tip>
+  Use regex patterns for advanced filtering. For example, `^2025` to find all sales from 2025.
+</Tip>
+
+## Exporting Sales Reports
+
+### CSV Export
+
+Export the complete sales history to CSV format:
+
+<Steps>
+  <Step title="Click Export">
+    Click **Exportar Reporte** in the sales view.
+  </Step>
+  
+  <Step title="Choose Location">
+    Select a save location. Default filename: `reporte_ventas.csv`
+  </Step>
+  
+  <Step title="Confirm Export">
+    The file will be created with all visible sales records (respects current filters).
+  </Step>
+</Steps>
+
+### CSV Format
+
+```csv
+ID Venta, ID Producto, Nombre del Medicamento, Cantidad Vendida, Fecha de Venta
+1, 5, Amoxicilina 500mg, 10, 2025-03-01
+2, 12, Meloxicam 15mg, 5, 2025-03-02
+```
+
+**Method**: `VentasView.java:284-307`
+
+<Note>
+  The export includes all rows currently displayed in the table, making it easy to export filtered subsets of data.
+</Note>
+
+## Refreshing Sales Data
+
+Click the **Refrescar Tabla** button to reload sales data from the database:
+
+```java
+// VentasView.java:309-311
+public void actualizarTabla() {
+    cargarVentas();
+}
+```
+
+This is useful after:
+- Registering new sales from another window
+- Making manual database changes
+- Ensuring you have the latest data
+
+## Sales Analytics
+
+### Viewing Sales Patterns
+
+<Tip>
+  Use the date filter combined with CSV export to analyze:
+  - Monthly sales volumes
+  - Best-selling products
+  - Seasonal trends
+  - Inventory turnover rates
+</Tip>
+
+### Product Performance
+
+<Tip>
+  Filter by product name to see all sales history for a specific product, helping identify:
+  - Total units sold
+  - Sales frequency
+  - Reorder points
+</Tip>
+
+## Best Practices
+
+<Tip>
+  **Double-Check Product IDs**: Always verify the product ID before registering a sale to prevent errors.
+</Tip>
+
+<Tip>
+  **Regular Backups**: Export sales data to CSV weekly as a backup and for offline analysis.
+</Tip>
+
+<Warning>
+  Never delete sales records unless absolutely necessary. They provide valuable historical data for business analysis.
+</Warning>
+
+<Tip>
+  **Audit Trail**: The sales history provides a complete audit trail. Review it regularly to catch data entry errors.
+</Tip>

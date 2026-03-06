@@ -1,80 +1,416 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get up and running with the Veterinaria ALFA Inventory System in minutes
+icon: rocket
 ---
 
-## Get started in three steps
-
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This quickstart guide will walk you through the essential operations to start managing your veterinary pharmacy inventory effectively.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Make sure you've completed the [installation](/installation) steps before proceeding.
 </Note>
+
+## Launching the Application
+
+Start the application using one of these methods:
+
+<CodeGroup>
+  ```bash Using Maven
+  mvn exec:java -Dexec.mainClass="InventarioApp"
+  ```
+
+  ```bash Using JAR file
+  java -jar target/Refactorizacion-ALFA-1.0-SNAPSHOT.jar
+  ```
+</CodeGroup>
+
+The main inventory window will open, displaying the **Inventario Veterinaria** interface (`view/InventarioView.java:34`).
+
+### Initial Launch Alert
+
+On first launch, you may see a caducity alert dialog (`view/InventarioView.java:161-172`):
+
+```
+Medicamentos próximos a caducar: X
+Medicamentos ya caducados: Y
+```
+
+This alert appears automatically when:
+- Medicines are within 30 days of expiration
+- Medicines have already expired
+
+<Warning>
+  Don't dismiss this alert without noting which products need attention. Check the inventory table for items highlighted in red.
+</Warning>
+
+## Understanding the Interface
+
+The main window consists of:
+
+<CardGroup cols={2}>
+  <Card title="Search Bar" icon="magnifying-glass">
+    Filter inventory by name, lot, or expiration date
+  </Card>
+  <Card title="Inventory Table" icon="table">
+    Displays all products with columns: ID, Name, Stock, Lot, Expiration, Entry Date
+  </Card>
+  <Card title="Action Buttons" icon="hand-pointer">
+    Agregar, Eliminar, Editar, Exportar a Excel, Ventas, Apartados
+  </Card>
+  <Card title="Color Coding" icon="palette">
+    Red cells indicate expired/expiring medicines
+  </Card>
+</CardGroup>
+
+### Expiration Color Indicators
+
+The table automatically highlights expiration dates (`view/InventarioView.java:345-367`):
+
+- **Dark Red (RGB 255, 0, 0)**: Product has expired
+- **Light Red (RGB 255, 153, 153)**: Product expires within 30 days
+- **Normal**: Product has more than 30 days until expiration
+
+## Adding Your First Medicine
+
+Let's add a medicine product to the inventory:
+
+<Steps>
+  <Step title="Open the Add Medicine dialog">
+    Click the **Agregar** button in the main window. This opens `AgregarMedicamentoView` (`view/AgregarMedicamentoView.java:17-21`).
+
+    <img src="/images/add-medicine-dialog.png" alt="Add Medicine Dialog" />
+  </Step>
+
+  <Step title="Fill in product details">
+    Enter the following information:
+
+    | Field | Description | Example |
+    |-------|-------------|----------|
+    | **Nombre** | Medicine name | Amoxicilina 500mg |
+    | **Existencias** | Initial stock quantity (use spinner) | 100 |
+    | **Lote** | Batch/lot number | L2024-001 |
+    | **Caducidad** | Expiration year and month | Año: 2025, Mes: 12 |
+
+    <Note>
+      The expiration date uses two dropdown menus for year and month. The system formats this as `yyyy-MM` (e.g., "2025-12") internally (`view/AgregarMedicamentoView.java:147-152`).
+    </Note>
+  </Step>
+
+  <Step title="Save the product">
+    Click **Guardar** to add the medicine. The system will:
+
+    1. Validate that all fields are filled (`view/AgregarMedicamentoView.java:138-145`)
+    2. Validate the expiration date format (`model/InventarioDAO.java:217-230`)
+    3. Ensure stock quantity is non-negative (`model/InventarioDAO.java:114-116`)
+    4. Insert the record into the `productos` table (`model/InventarioDAO.java:119-127`)
+    5. Automatically set `fechaEntrada` to today's date (`model/InventarioDAO.java:118`)
+
+    ```java
+    String fechaEntrada = LocalDate.now().toString(); // ISO 8601 format
+    String sql = "INSERT INTO productos (nombre, existencias, lote, caducidad, fechaEntrada) VALUES (?, ?, ?, ?, ?)";
+    ```
+
+    You'll see a success confirmation, and the product will appear in the main table.
+  </Step>
+</Steps>
+
+<Warning>
+  **Validation Rules:**
+  - All fields are required
+  - Stock quantity must be ≥ 0
+  - Expiration date must be in `yyyy-MM` format (enforced by dropdowns)
+</Warning>
+
+## Recording Your First Sale
+
+Now let's record a sale transaction:
+
+<Steps>
+  <Step title="Open the Sales window">
+    From the main window, click **Ventas**. This opens `VentasView` which displays the sales history table.
+  </Step>
+
+  <Step title="Register a new sale">
+    Click **Agregar Venta** to open `RegistrarVentaView` (`view/RegistrarVentaView.java:13-18`).
+
+    Enter:
+
+    | Field | Description | Example |
+    |-------|-------------|----------|
+    | **ID del Medicamento** | Product ID from inventory | 1 |
+    | **Nombre del Medicamento** | Exact product name (must match) | Amoxicilina 500mg |
+    | **Cantidad Vendida** | Units sold (use spinner, min: 1) | 10 |
+
+    <Warning>
+      The product name must **exactly match** the name in the database. The system validates this to prevent errors (`model/InventarioDAO.java:266-270`).
+    </Warning>
+  </Step>
+
+  <Step title="Save the sale">
+    Click **Guardar**. The system performs several operations in a transaction (`model/InventarioDAO.java:247-309`):
+
+    ```java
+    // 1. Verify product exists and name matches
+    String selectQuery = "SELECT nombre, existencias FROM productos WHERE id = ?";
+    
+    // 2. Check sufficient stock
+    if (cantidadVendida > existenciasActuales) {
+        JOptionPane.showMessageDialog(null, "No hay suficientes existencias.");
+        return false;
+    }
+    
+    // 3. Start transaction
+    connection.setAutoCommit(false);
+    
+    // 4. Deduct from inventory
+    String updateQuery = "UPDATE productos SET existencias = existencias - ? WHERE id = ?";
+    
+    // 5. Record in sales history
+    String fechaVenta = LocalDate.now().toString();
+    String insertHistorial = "INSERT INTO historial_ventas (idProducto, nombre, cantidad, fechaVenta) VALUES (?, ?, ?, ?)";
+    
+    // 6. Commit transaction
+    connection.commit();
+    ```
+
+    The inventory stock will be automatically reduced, and the sale will appear in the sales history table.
+  </Step>
+</Steps>
+
+<Note>
+  Sales are recorded with a foreign key relationship to products. If a product is deleted, all associated sales history is also removed (CASCADE DELETE defined in `model/InventarioDAO.java:85`).
+</Note>
+
+## Viewing and Searching Inventory
+
+The main inventory table provides powerful search and sorting capabilities:
+
+### Searching Products
+
+<Steps>
+  <Step title="Use the search bar">
+    Type in the **Buscar** field at the top of the window (`view/InventarioView.java:100-106`). The table filters in real-time as you type.
+
+    You can search by:
+    - Medicine name
+    - Lot number  
+    - Expiration date
+
+    ```java
+    // Case-insensitive regex filter
+    rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + criterio));
+    ```
+  </Step>
+
+  <Step title="Clear the filter">
+    Delete the text in the search field or click **Refrescar** to show all products.
+  </Step>
+</Steps>
+
+### Sorting Columns
+
+Click any column header to sort:
+- Click once: Sort ascending
+- Click again: Sort descending
+- Click a third time: Return to default order
+
+The **Existencias** column sorts numerically (not alphabetically) for accurate stock ordering (`view/InventarioView.java:208-217`).
+
+### Selecting Multiple Items
+
+You can select multiple products for batch operations:
+- **Click + Drag**: Select range
+- **Ctrl + Click** (Windows/Linux) or **Cmd + Click** (macOS): Select individual items
+- **Shift + Click**: Select from last selection to current
+
+## Basic Inventory Operations
+
+### Editing a Product
+
+<Steps>
+  <Step title="Select a product">
+    Click on any row in the inventory table to select a product.
+  </Step>
+
+  <Step title="Open edit dialog">
+    Click the **Editar** button. The `EditarMedicamentoView` dialog opens with pre-filled fields.
+  </Step>
+
+  <Step title="Modify and save">
+    Update any fields (name, stock, lot, expiration) and click **Guardar**.
+
+    The system updates the product via `editarProducto()` (`model/InventarioDAO.java:157-195`):
+
+    ```java
+    String sql = "UPDATE productos SET nombre = ?, existencias = ?, lote = ?, caducidad = ?, fechaEntrada = ? WHERE id = ?";
+    ```
+  </Step>
+</Steps>
+
+### Deleting Products
+
+<Steps>
+  <Step title="Select product(s)">
+    Select one or more products to delete (hold Ctrl/Cmd for multiple).
+  </Step>
+
+  <Step title="Click Eliminar">
+    Click the **Eliminar** button (red). You'll see a confirmation dialog.
+  </Step>
+
+  <Step title="Confirm deletion">
+    Click **Yes** to permanently delete. This removes:
+    - The product from `productos` table
+    - All associated sales records (CASCADE DELETE)
+
+    ```java
+    String sql = "DELETE FROM productos WHERE id = ?";
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Deletion is **permanent** and cannot be undone. All sales history for deleted products will also be removed.
+</Warning>
+
+### Refreshing the View
+
+Click **Refrescar** at any time to reload data from the database. This is useful if:
+- You suspect data is stale
+- You've made changes in another window (Ventas, Apartados)
+- You want to clear search filters
+
+## Exporting Data
+
+Export your inventory to CSV format for use in Excel or other tools:
+
+<Steps>
+  <Step title="Click Export button">
+    Click **Exportar a Excel** in the main window.
+  </Step>
+
+  <Step title="Choose save location">
+    A file dialog opens with default name `inventario.csv`. Choose where to save the file.
+  </Step>
+
+  <Step title="Open in Excel">
+    The CSV file contains all inventory data with headers (`model/InventarioDAO.java:459-482`):
+
+    ```csv
+    ID,Nombre,Existencias,Lote,Caducidad,Fecha Entrada
+    1,Amoxicilina 500mg,90,L2024-001,2025-12,2024-03-06
+    2,Ibuprofeno 400mg,50,L2024-002,2025-06,2024-03-06
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  You can also export sales history and reserved products from their respective windows using the same process.
+</Note>
+
+## Keyboard Shortcuts and Tips
+
+<AccordionGroup>
+  <Accordion title="Navigation shortcuts">
+    - **Tab**: Move between fields in dialogs
+    - **Enter**: Submit forms (same as clicking Guardar)
+    - **Escape**: Close dialogs (same as clicking Cancelar)
+    - **Arrow keys**: Navigate table cells
+  </Accordion>
+
+  <Accordion title="Selection shortcuts">
+    - **Ctrl+A** (Windows/Linux) or **Cmd+A** (macOS): Select all rows
+    - **Ctrl+Click**: Add/remove individual rows from selection
+    - **Shift+Click**: Select range of rows
+  </Accordion>
+
+  <Accordion title="UI interactions">
+    - **Hover over rows**: Highlights row with light blue background
+    - **Click column headers**: Sort by that column
+    - **Double-click empty space**: Deselect all rows
+    - **Right-click**: Context menu (future feature)
+  </Accordion>
+
+  <Accordion title="Performance tips">
+    - Use search to filter large inventories instead of scrolling
+    - Click Refrescar if the table seems out of sync
+    - Export data regularly for backup purposes
+    - Close unused windows (Ventas, Apartados) to save memory
+  </Accordion>
+</AccordionGroup>
+
+## Common Tasks Reference
+
+<CardGroup cols={2}>
+  <Card title="Check expiring medicines" icon="calendar-exclamation">
+    Look for red-highlighted rows in the Caducidad column. Dark red = expired, light red = expires soon.
+  </Card>
+  <Card title="Find a specific medicine" icon="search">
+    Type the name, lot, or date in the search bar. The table filters automatically.
+  </Card>
+  <Card title="Restock a product" icon="box">
+    Select the product, click **Editar**, increase Existencias, and save.
+  </Card>
+  <Card title="View low stock" icon="chart-line-down">
+    Click the **Existencias** column header to sort by stock quantity (lowest first).
+  </Card>
+  <Card title="Undo a sale" icon="rotate-left">
+    Open **Ventas** window, select the sale, click **Eliminar**. Note: This does NOT restore inventory.
+  </Card>
+  <Card title="Reserve medicine" icon="tag">
+    Click **Apartados**, then **Registrar Apartado** to mark products as reserved.
+  </Card>
+</CardGroup>
+
+## What's Next?
+
+Now that you're familiar with the basics, explore more advanced features:
+
+<CardGroup cols={3}>
+  <Card title="Inventory Management" icon="boxes-stacked" href="/guide/inventory-management">
+    Complete inventory guide
+  </Card>
+  <Card title="Sales Tracking" icon="chart-line" href="/guide/sales-tracking">
+    Track and manage sales transactions
+  </Card>
+  <Card title="Product Reservation" icon="bookmark" href="/guide/product-reservation">
+    Handle reserved inventory
+  </Card>
+  <Card title="CSV Export" icon="file-export" href="/guide/csv-export">
+    Export data to Excel/CSV
+  </Card>
+  <Card title="Expiration Monitoring" icon="bell" href="/guide/expiration-monitoring">
+    Monitor expiring products
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/reference/architecture">
+    Understand the technical design
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+If you encounter issues or have questions:
+
+<Steps>
+  <Step title="Check the documentation">
+    Browse the [User Guide](/user-guide) for detailed feature explanations.
+  </Step>
+
+  <Step title="Review error messages">
+    The application shows descriptive error dialogs. Read them carefully for hints.
+  </Step>
+
+  <Step title="Verify data integrity">
+    Check that:
+    - Product IDs exist when recording sales
+    - Product names match exactly (case-sensitive)
+    - Stock quantities are sufficient for sales
+  </Step>
+
+  <Step title="Contact support">
+    If problems persist, contact your system administrator with:
+    - Error message text
+    - Steps to reproduce the issue
+    - Database backup (from `./db/baseDeDatosInventario.db`)
+  </Step>
+</Steps>

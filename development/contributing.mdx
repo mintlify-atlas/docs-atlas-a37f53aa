@@ -1,0 +1,432 @@
+---
+title: 'Contributing Guide'
+description: 'Guidelines for contributing to the Veterinaria ALFA Inventory System'
+---
+
+## How to Contribute
+
+We welcome contributions to the Veterinaria ALFA Inventory System! Whether you're fixing bugs, adding features, or improving documentation, your help is appreciated.
+
+### Getting Started
+
+<Steps>
+  <Step title="Fork and Clone">
+    Fork the repository and clone it to your local machine:
+    
+    ```bash
+    git clone <your-fork-url>
+    cd Refactorizacion-ALFA
+    ```
+  </Step>
+  
+  <Step title="Set Up Development Environment">
+    Ensure you have the prerequisites installed:
+    - Java Development Kit (JDK) 21
+    - Apache Maven 3.6+
+    - Git
+    
+    See the [Building Guide](/development/building) for detailed setup instructions.
+  </Step>
+  
+  <Step title="Create a Branch">
+    Create a new branch for your changes:
+    
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+    
+    Use descriptive branch names:
+    - `feature/add-inventory-export`
+    - `fix/database-connection-error`
+    - `docs/update-api-documentation`
+  </Step>
+</Steps>
+
+## Development Workflow
+
+### 1. Making Changes
+
+Follow the project structure and coding conventions:
+
+<CodeGroup>
+```bash Controller Layer
+src/main/java/controller/
+# Business logic and coordination
+```
+
+```bash Model Layer
+src/main/java/model/
+# Data access and database operations
+```
+
+```bash View Layer
+src/main/java/view/
+# User interface components
+```
+</CodeGroup>
+
+### 2. Build and Test
+
+Before committing, ensure your code builds and tests pass:
+
+```bash
+# Clean build
+mvn clean
+
+# Compile and test
+mvn test
+
+# Full package
+mvn package
+```
+
+<Note>
+  Always run the full build before submitting a pull request to ensure you haven't introduced any breaking changes.
+</Note>
+
+### 3. Commit Your Changes
+
+Write clear, descriptive commit messages:
+
+```bash
+git add .
+git commit -m "Add: inventory export functionality"
+```
+
+#### Commit Message Convention
+
+Use the following prefixes:
+
+- **Add**: New features or functionality
+- **Fix**: Bug fixes
+- **Update**: Improvements to existing features
+- **Refactor**: Code restructuring without functionality changes
+- **Docs**: Documentation changes
+- **Test**: Adding or updating tests
+- **Chore**: Maintenance tasks
+
+**Good Examples:**
+```
+Add: SQLite connection pooling for better performance
+Fix: null pointer exception in InventarioDAO
+Update: improve error messages in view layer
+Refactor: extract duplicate code in controller classes
+```
+
+**Bad Examples:**
+```
+Updated stuff
+fixed bug
+changes
+```
+
+### 4. Push to Your Fork
+
+```bash
+git push origin feature/your-feature-name
+```
+
+### 5. Create a Pull Request
+
+Open a pull request from your fork to the main repository:
+
+<Steps>
+  <Step title="Provide a Clear Title">
+    Use the same convention as commit messages:
+    - "Add: Inventory export to CSV functionality"
+    - "Fix: Database connection timeout issue"
+  </Step>
+  
+  <Step title="Write a Detailed Description">
+    Include:
+    - What changes were made
+    - Why the changes were necessary
+    - How to test the changes
+    - Screenshots (for UI changes)
+    - Related issues (if applicable)
+  </Step>
+  
+  <Step title="Link Related Issues">
+    If your PR addresses an issue, reference it:
+    
+    ```
+    Fixes #123
+    Closes #456
+    Related to #789
+    ```
+  </Step>
+</Steps>
+
+## Code Style Guidelines
+
+### Java Coding Standards
+
+<CodeGroup>
+```java Class Naming
+// Use PascalCase for classes
+public class InventarioController {
+    // ...
+}
+```
+
+```java Method Naming
+// Use camelCase for methods
+public void agregarMedicamento(String nombre) {
+    // ...
+}
+```
+
+```java Constants
+// Use UPPER_SNAKE_CASE for constants
+public static final String DATABASE_PATH = "input/inventario.db";
+```
+</CodeGroup>
+
+### Code Formatting
+
+- **Indentation**: Use 4 spaces (no tabs)
+- **Line Length**: Maximum 120 characters
+- **Braces**: Opening brace on same line, closing brace on new line
+- **Spacing**: One blank line between methods
+
+```java
+public class ExampleClass {
+    private String field;
+    
+    public void methodOne() {
+        // Implementation
+    }
+    
+    public void methodTwo() {
+        // Implementation
+    }
+}
+```
+
+### Documentation
+
+Add JavaDoc comments for public classes and methods:
+
+```java
+/**
+ * Manages inventory operations for veterinary medications.
+ * 
+ * @author Your Name
+ * @version 1.0
+ */
+public class InventarioController {
+    
+    /**
+     * Adds a new medication to the inventory.
+     * 
+     * @param nombre the name of the medication
+     * @param cantidad the quantity to add
+     * @return true if successful, false otherwise
+     */
+    public boolean agregarMedicamento(String nombre, int cantidad) {
+        // Implementation
+    }
+}
+```
+
+## Testing Guidelines
+
+### Writing Tests
+
+The project uses JUnit Jupiter (5.10.0) for testing. Place test files in:
+
+```
+src/test/java/
+```
+
+<Warning>
+  Currently, the project structure does not include a test directory. If you're adding tests, create the directory structure first.
+</Warning>
+
+### Test Structure
+
+```java
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import static org.junit.jupiter.api.Assertions.*;
+
+class InventarioDAOTest {
+    
+    private InventarioDAO dao;
+    
+    @BeforeEach
+    void setUp() {
+        // Initialize test fixtures
+        dao = new InventarioDAO();
+    }
+    
+    @Test
+    void testAgregarMedicamento() {
+        // Arrange
+        String nombre = "Test Medicine";
+        int cantidad = 10;
+        
+        // Act
+        boolean result = dao.agregarMedicamento(nombre, cantidad);
+        
+        // Assert
+        assertTrue(result, "Should successfully add medication");
+    }
+    
+    @AfterEach
+    void tearDown() {
+        // Clean up test data
+    }
+}
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+mvn test
+
+# Run specific test class
+mvn test -Dtest=InventarioDAOTest
+
+# Run with verbose output
+mvn test -X
+```
+
+## Project-Specific Guidelines
+
+### Database Operations
+
+When working with the SQLite database:
+
+- Always use prepared statements to prevent SQL injection
+- Close connections and statements properly
+- Handle exceptions appropriately
+- Use the DAO pattern for database operations
+
+```java
+try (Connection conn = DriverManager.getConnection(DATABASE_URL);
+     PreparedStatement pstmt = conn.prepareStatement(sql)) {
+    
+    pstmt.setString(1, nombre);
+    pstmt.executeUpdate();
+    
+} catch (SQLException e) {
+    // Handle exception
+}
+```
+
+### UI Components
+
+When modifying or adding view components:
+
+- Follow the existing MVC pattern
+- Keep view logic separate from business logic
+- Use JCalendar components for date selection
+- Ensure proper event handling and listeners
+- Test UI changes manually before submitting
+
+### Dependencies
+
+Before adding new dependencies:
+
+1. Check if existing dependencies can fulfill the requirement
+2. Verify the dependency is actively maintained
+3. Check for security vulnerabilities
+4. Update `pom.xml` with appropriate version and scope
+
+```xml
+<dependency>
+    <groupId>group.id</groupId>
+    <artifactId>artifact-id</artifactId>
+    <version>1.0.0</version>
+    <scope>compile</scope> <!-- or test -->
+</dependency>
+```
+
+## Pull Request Review Process
+
+Once you submit a pull request:
+
+<Steps>
+  <Step title="Automated Checks">
+    Wait for automated build checks to complete. Address any failures.
+  </Step>
+  
+  <Step title="Code Review">
+    Maintainers will review your code and may request changes.
+    
+    Be responsive to feedback and make requested changes promptly.
+  </Step>
+  
+  <Step title="Testing">
+    Reviewers may test your changes manually to ensure functionality.
+  </Step>
+  
+  <Step title="Merge">
+    Once approved, a maintainer will merge your pull request.
+  </Step>
+</Steps>
+
+### What Reviewers Look For
+
+- Code quality and adherence to style guidelines
+- Proper error handling
+- Test coverage (if applicable)
+- Documentation updates
+- No breaking changes without discussion
+- Performance implications
+
+## Getting Help
+
+If you need help or have questions:
+
+- Check the [documentation](/introduction) first
+- Look through existing issues and pull requests
+- Open a new issue with your question
+- Tag your issue appropriately (question, help wanted, etc.)
+
+<Note>
+  When asking for help, provide as much context as possible: what you're trying to achieve, what you've tried, error messages, and relevant code snippets.
+</Note>
+
+## Types of Contributions
+
+### Bug Fixes
+
+- Report bugs through issues
+- Include steps to reproduce
+- Provide error messages and logs
+- Submit a fix with tests
+
+### New Features
+
+- Discuss major features in an issue first
+- Get consensus before starting work
+- Include documentation updates
+- Add tests for new functionality
+
+### Documentation
+
+- Fix typos and improve clarity
+- Add examples and tutorials
+- Update outdated information
+- Translate documentation (if applicable)
+
+### Code Refactoring
+
+- Discuss refactoring plans in an issue
+- Ensure tests pass after refactoring
+- Maintain backward compatibility
+- Document any API changes
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the same license as the project.
+
+## Recognition
+
+Contributors who make significant contributions will be recognized in the project documentation and release notes.
+
+Thank you for contributing to the Veterinaria ALFA Inventory System!

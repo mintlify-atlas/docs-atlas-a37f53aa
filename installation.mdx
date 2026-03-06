@@ -1,0 +1,322 @@
+---
+title: Installation
+description: Learn how to install and set up the Veterinaria ALFA Inventory System
+icon: download
+---
+
+This guide walks you through installing all prerequisites and setting up the Veterinaria ALFA Inventory System on your machine.
+
+## System Requirements
+
+Before installing the application, ensure your system meets the following requirements:
+
+<CardGroup cols={2}>
+  <Card title="Java 21" icon="coffee">
+    Java Development Kit (JDK) version 21 or higher
+  </Card>
+  <Card title="Apache Maven" icon="box">
+    Maven 3.6 or higher for building the project
+  </Card>
+  <Card title="Operating System" icon="desktop">
+    Windows, macOS, or Linux
+  </Card>
+  <Card title="Memory" icon="memory">
+    Minimum 512 MB RAM (1 GB recommended)
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install Java 21">
+    The application requires Java 21 to run. Download and install the appropriate version for your operating system:
+
+    <Tabs>
+      <Tab title="Windows">
+        1. Download Java 21 from [Oracle](https://www.oracle.com/java/technologies/downloads/#java21) or [Adoptium](https://adoptium.net/)
+        2. Run the installer and follow the installation wizard
+        3. Verify installation by opening Command Prompt and running:
+        ```bash
+        java -version
+        ```
+        You should see output indicating Java version 21.x.x
+      </Tab>
+      <Tab title="macOS">
+        Install using Homebrew:
+        ```bash
+        brew install openjdk@21
+        ```
+        Then verify the installation:
+        ```bash
+        java -version
+        ```
+      </Tab>
+      <Tab title="Linux">
+        Install using your package manager:
+        ```bash
+        # Ubuntu/Debian
+        sudo apt update
+        sudo apt install openjdk-21-jdk
+
+        # Fedora
+        sudo dnf install java-21-openjdk
+        ```
+        Verify the installation:
+        ```bash
+        java -version
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Install Apache Maven">
+    Maven is required to build the project from source.
+
+    <Tabs>
+      <Tab title="Windows">
+        1. Download Maven from [maven.apache.org](https://maven.apache.org/download.cgi)
+        2. Extract the archive to a directory (e.g., `C:\Program Files\Apache\maven`)
+        3. Add Maven's `bin` directory to your system PATH
+        4. Verify installation:
+        ```bash
+        mvn -version
+        ```
+      </Tab>
+      <Tab title="macOS">
+        Install using Homebrew:
+        ```bash
+        brew install maven
+        ```
+        Verify the installation:
+        ```bash
+        mvn -version
+        ```
+      </Tab>
+      <Tab title="Linux">
+        Install using your package manager:
+        ```bash
+        # Ubuntu/Debian
+        sudo apt install maven
+
+        # Fedora
+        sudo dnf install maven
+        ```
+        Verify the installation:
+        ```bash
+        mvn -version
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Download the Source Code">
+    Clone or download the project repository:
+
+    ```bash
+    git clone https://github.com/your-org/Refactorizacion-ALFA.git
+    cd Refactorizacion-ALFA
+    ```
+
+    <Note>
+      If you don't have Git installed, you can download the source code as a ZIP file from the repository and extract it.
+    </Note>
+  </Step>
+</Steps>
+
+## Building the Application
+
+Once you have all prerequisites installed, build the application using Maven:
+
+<Steps>
+  <Step title="Clean and compile the project">
+    Navigate to the project directory and run:
+
+    ```bash
+    mvn clean compile
+    ```
+
+    This command:
+    - Cleans any previous build artifacts
+    - Compiles all Java source files in `src/main/java/`
+    - Downloads required dependencies (SQLite JDBC, JCalendar)
+  </Step>
+
+  <Step title="Package the application">
+    Create an executable JAR file with all dependencies included:
+
+    ```bash
+    mvn package
+    ```
+
+    This uses the Maven Shade plugin (configured in `pom.xml:69-89`) to create a "fat JAR" containing:
+    - All compiled classes
+    - SQLite JDBC driver (org.xerial:sqlite-jdbc:3.41.2.1)
+    - JCalendar library (com.toedter:jcalendar:1.4)
+    - Main class manifest entry pointing to `InventarioApp`
+
+    <Note>
+      The packaged JAR will be located at `target/Refactorizacion-ALFA-1.0-SNAPSHOT.jar`
+    </Note>
+  </Step>
+
+  <Step title="Verify the build">
+    Check that the JAR file was created successfully:
+
+    ```bash
+    ls -lh target/*.jar
+    ```
+
+    You should see the shaded JAR file (typically larger due to included dependencies).
+  </Step>
+</Steps>
+
+## Database Initialization
+
+The application uses SQLite for data storage and automatically handles database setup:
+
+<Warning>
+  **No manual database setup required!** The application automatically creates the database on first run.
+</Warning>
+
+### Automatic Setup Process
+
+When you launch the application for the first time, the `InventarioDAO` class (`model/InventarioDAO.java:46-66`) automatically:
+
+1. Creates a `./db` directory in the application's working directory
+2. Initializes an SQLite database file: `./db/baseDeDatosInventario.db`
+3. Creates required tables via `crearBaseDeDatos()` method (`model/InventarioDAO.java:69-89`):
+
+```java
+// From InventarioDAO.java:71-78
+CREATE TABLE IF NOT EXISTS productos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT,
+    existencias INTEGER,
+    lote TEXT,
+    caducidad TEXT,
+    fechaEntrada TEXT,
+    fecha_separado TEXT
+)
+```
+
+```java
+// From InventarioDAO.java:79-85
+CREATE TABLE IF NOT EXISTS historial_ventas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    idProducto INTEGER,
+    nombre TEXT,
+    cantidad INTEGER,
+    fechaVenta TEXT,
+    FOREIGN KEY (idProducto) REFERENCES productos(id) ON DELETE CASCADE
+)
+```
+
+### Database Schema
+
+<Accordion title="productos table">
+  Stores all medicine inventory items:
+
+  | Column | Type | Description |
+  |--------|------|-------------|
+  | `id` | INTEGER | Primary key, auto-increment |
+  | `nombre` | TEXT | Medicine name |
+  | `existencias` | INTEGER | Current stock quantity |
+  | `lote` | TEXT | Batch/lot number |
+  | `caducidad` | TEXT | Expiration date (format: yyyy-MM) |
+  | `fechaEntrada` | TEXT | Date added to inventory |
+  | `fecha_separado` | TEXT | Date reserved/separated (nullable) |
+</Accordion>
+
+<Accordion title="historial_ventas table">
+  Records all sales transactions:
+
+  | Column | Type | Description |
+  |--------|------|-------------|
+  | `id` | INTEGER | Primary key, auto-increment |
+  | `idProducto` | INTEGER | Foreign key to productos.id |
+  | `nombre` | TEXT | Medicine name at time of sale |
+  | `cantidad` | INTEGER | Quantity sold |
+  | `fechaVenta` | TEXT | Sale date (ISO 8601 format) |
+</Accordion>
+
+## Running the Application
+
+After building, you can run the application in two ways:
+
+<CodeGroup>
+  ```bash Using Maven
+  mvn exec:java -Dexec.mainClass="InventarioApp"
+  ```
+
+  ```bash Using Java directly
+  java -jar target/Refactorizacion-ALFA-1.0-SNAPSHOT.jar
+  ```
+</CodeGroup>
+
+The main application window will launch automatically. The entry point is in `InventarioApp.java:7-13`:
+
+```java
+public static void main(String[] args) {
+    SwingUtilities.invokeLater(() -> {
+        InventarioDAO dao = new InventarioDAO();
+        dao.crearBaseDeDatos(); // Creates tables if they don't exist
+        InventarioController controller = new InventarioController(dao);
+        new InventarioView(controller);
+    });
+}
+```
+
+<Note>
+  On first launch, the application may display a caducity alert dialog if any medicines are near expiration (within 30 days) or already expired. This is normal behavior.
+</Note>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Java version error">
+    If you see an error like `UnsupportedClassVersionError` or `requires Java 21 or higher`:
+
+    1. Verify your Java version: `java -version`
+    2. Ensure you're using JDK 21 (not an older version)
+    3. Check your `JAVA_HOME` environment variable points to Java 21
+  </Accordion>
+
+  <Accordion title="Maven build fails">
+    If Maven cannot download dependencies:
+
+    1. Check your internet connection
+    2. Try clearing Maven's local cache:
+       ```bash
+       mvn clean -U
+       ```
+    3. Verify your Maven settings in `~/.m2/settings.xml`
+  </Accordion>
+
+  <Accordion title="Database permissions error">
+    If the application cannot create the database:
+
+    1. Ensure the application has write permissions in its directory
+    2. Try running from a user-writable location (avoid system directories)
+    3. Check disk space availability
+  </Accordion>
+
+  <Accordion title="Application won't start">
+    If the window doesn't appear:
+
+    1. Check for errors in the terminal/console
+    2. Verify the JAR was built correctly: `jar tf target/*.jar | grep InventarioApp.class`
+    3. Ensure no other instance is running
+    4. Try running with verbose output: `java -jar target/*.jar -verbose`
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Learn how to use the application
+  </Card>
+  <Card title="Inventory Management" icon="book" href="/guide/inventory-management">
+    Explore inventory features
+  </Card>
+</CardGroup>

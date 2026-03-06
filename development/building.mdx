@@ -1,0 +1,317 @@
+---
+title: 'Building the Application'
+description: 'Complete guide to building the Veterinaria ALFA Inventory System from source'
+---
+
+## Prerequisites
+
+Before building the application, ensure you have the following installed:
+
+<Steps>
+  <Step title="Java Development Kit (JDK) 21">
+    The project requires Java 21 or later. Verify your installation:
+    
+    ```bash
+    java -version
+    ```
+    
+    The output should show version 21 or higher.
+  </Step>
+  
+  <Step title="Apache Maven 3.6+">
+    Maven is used for dependency management and building. Verify installation:
+    
+    ```bash
+    mvn -version
+    ```
+  </Step>
+  
+  <Step title="Git">
+    Required for cloning the repository:
+    
+    ```bash
+    git --version
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The project uses Maven's compiler plugin version 3.13.0 configured for Java 21 source and target compatibility.
+</Note>
+
+## Cloning the Repository
+
+Clone the project repository to your local machine:
+
+```bash
+git clone <repository-url>
+cd Refactorizacion-ALFA
+```
+
+## Project Structure
+
+The project follows Maven's standard directory layout:
+
+```
+Refactorizacion-ALFA/
+├── pom.xml                 # Maven configuration
+├── src/
+│   └── main/
+│       └── java/
+│           ├── InventarioApp.java
+│           ├── controller/
+│           ├── model/
+│           └── view/
+├── input/                  # Input data files
+└── target/                 # Build output (generated)
+```
+
+## Dependencies
+
+The project uses the following main dependencies:
+
+- **SQLite JDBC** (3.41.2.1): Database connectivity
+- **JUnit Jupiter** (5.10.0): Testing framework (test scope)
+- **JCalendar** (1.4): Date picker components
+
+## Building the Application
+
+### Clean Build
+
+To perform a clean build, removing any previous build artifacts:
+
+```bash
+mvn clean
+```
+
+### Compile Source Code
+
+To compile the source code without running tests:
+
+```bash
+mvn compile
+```
+
+### Package the Application
+
+To create both a standard JAR and a fat JAR with all dependencies:
+
+```bash
+mvn package
+```
+
+This command will:
+1. Compile the source code
+2. Run tests (if present)
+3. Create a standard JAR in `target/`
+4. Create a fat JAR with all dependencies using the Maven Shade Plugin
+
+<Note>
+  The Maven Shade Plugin is configured to create an executable JAR that includes all dependencies (SQLite JDBC, JCalendar) bundled together.
+</Note>
+
+### Skip Tests During Build
+
+If you need to build without running tests:
+
+```bash
+mvn package -DskipTests
+```
+
+## Build Output
+
+After a successful build, you'll find the following in the `target/` directory:
+
+<CodeGroup>
+```bash Standard JAR
+target/Refactorizacion-ALFA-1.0-SNAPSHOT.jar
+```
+
+```bash Fat JAR (with dependencies)
+target/Refactorizacion-ALFA-1.0-SNAPSHOT-shaded.jar
+```
+</CodeGroup>
+
+<Warning>
+  Use the shaded JAR (fat JAR) for distribution and execution, as it contains all required dependencies.
+</Warning>
+
+## Running the Application
+
+### From Fat JAR
+
+The recommended way to run the application is using the fat JAR:
+
+```bash
+java -jar target/Refactorizacion-ALFA-1.0-SNAPSHOT.jar
+```
+
+### From Maven
+
+Alternatively, you can run directly using Maven:
+
+```bash
+mvn exec:java -Dexec.mainClass="InventarioApp"
+```
+
+## Maven Plugins Configuration
+
+### Compiler Plugin
+
+Configured for Java 21 compilation:
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>3.13.0</version>
+    <configuration>
+        <source>21</source>
+        <target>21</target>
+    </configuration>
+</plugin>
+```
+
+### JAR Plugin
+
+Creates a standard JAR with manifest entry for the main class:
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-jar-plugin</artifactId>
+    <version>3.2.2</version>
+    <configuration>
+        <archive>
+            <manifest>
+                <mainClass>InventarioApp</mainClass>
+            </manifest>
+        </archive>
+    </configuration>
+</plugin>
+```
+
+### Shade Plugin
+
+Creates an executable fat JAR with all dependencies:
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-shade-plugin</artifactId>
+    <version>3.3.0</version>
+    <executions>
+        <execution>
+            <phase>package</phase>
+            <goals>
+                <goal>shade</goal>
+            </goals>
+            <configuration>
+                <createDependencyReducedPom>true</createDependencyReducedPom>
+                <transformers>
+                    <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                        <mainClass>InventarioApp</mainClass>
+                    </transformer>
+                </transformers>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+```
+
+## Troubleshooting
+
+### Build Failures
+
+<Steps>
+  <Step title="Java Version Mismatch">
+    If you see compilation errors about language level:
+    
+    ```bash
+    [ERROR] Source option 21 is no longer supported. Use 21 or later.
+    ```
+    
+    Ensure you're using JDK 21 or later:
+    
+    ```bash
+    java -version
+    echo $JAVA_HOME
+    ```
+  </Step>
+  
+  <Step title="Dependency Download Issues">
+    If Maven fails to download dependencies:
+    
+    ```bash
+    # Clear local repository cache
+    rm -rf ~/.m2/repository/org/xerial/sqlite-jdbc
+    rm -rf ~/.m2/repository/com/toedter/jcalendar
+    
+    # Retry with force update
+    mvn clean package -U
+    ```
+  </Step>
+  
+  <Step title="Out of Memory Errors">
+    For large builds, increase Maven memory:
+    
+    ```bash
+    export MAVEN_OPTS="-Xmx1024m -XX:MaxPermSize=256m"
+    mvn clean package
+    ```
+  </Step>
+</Steps>
+
+### Missing Main Class
+
+If you encounter errors about missing main class when running the JAR:
+
+```bash
+no main manifest attribute, in target/Refactorizacion-ALFA-1.0-SNAPSHOT.jar
+```
+
+Make sure you're using the shaded JAR or run the build again to ensure the manifest is properly configured.
+
+### Database File Not Found
+
+The application expects the SQLite database file. Ensure your database is properly configured in the `input/` directory or as specified in the application configuration.
+
+## Build Lifecycle
+
+Maven executes the following phases during `mvn package`:
+
+1. **validate**: Validates the project structure
+2. **compile**: Compiles source code
+3. **test**: Runs unit tests with JUnit
+4. **package**: Packages compiled code into JAR
+5. **shade**: Creates fat JAR with dependencies
+
+<Note>
+  The shade plugin is bound to the package phase and automatically executes when you run `mvn package`.
+</Note>
+
+## Additional Commands
+
+### View Dependency Tree
+
+```bash
+mvn dependency:tree
+```
+
+### Clean Build Artifacts
+
+```bash
+mvn clean
+```
+
+### Install to Local Repository
+
+```bash
+mvn install
+```
+
+### Generate Project Information
+
+```bash
+mvn site
+```
