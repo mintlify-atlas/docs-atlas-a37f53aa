@@ -1,0 +1,68 @@
+{
+  "projectType": "general",
+  "projectName": "Veterinaria ALFA Inventory System",
+  "projectDescription": "Desktop inventory management system for tracking veterinary medicines, sales, and product expiration at Veterinaria ALFA in Cancún.",
+  "theme": "linden",
+  "primaryColor": "#2E7D32",
+  "lightColor": "#66BB6A",
+  "darkColor": "#1B5E20",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "installation",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "User Guide",
+        "pages": [
+          "guide/inventory-management",
+          "guide/sales-tracking",
+          "guide/product-reservation",
+          "guide/expiration-monitoring",
+          "guide/csv-export"
+        ]
+      },
+      {
+        "group": "Technical Reference",
+        "pages": [
+          "reference/architecture",
+          "reference/database-schema",
+          "reference/configuration"
+        ]
+      },
+      {
+        "group": "Development",
+        "pages": [
+          "development/building",
+          "development/contributing"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Medicine inventory management with batch and expiration tracking",
+    "Sales registration and history with automatic stock updates",
+    "Product reservation system for separated items",
+    "Expiration date monitoring and alerts",
+    "CSV export for inventory, sales, and reserved products",
+    "SQLite database for data persistence"
+  ],
+  "publicApiSurface": [
+    "InventarioController.agregarProducto(nombre, existencias, lote, caducidad)",
+    "InventarioController.editarProducto(id, nombre, existencias, lote, caducidad, fechaEntrada)",
+    "InventarioController.eliminarProducto(id)",
+    "InventarioController.registrarVenta(id, nombre, cantidad)",
+    "InventarioController.editarVenta(id, nuevoNombre, nuevaCantidad, nuevaFecha)",
+    "InventarioController.eliminarVenta(id)",
+    "InventarioController.separarProducto(id, fechaSeparado)",
+    "InventarioController.obtenerMedicamentosProximosACaducar(diasUmbral)",
+    "InventarioController.obtenerMedicamentosCaducados()",
+    "InventarioController.exportarCSV(fileToSave)",
+    "InventarioController.exportarInventarioCSV(fileToSave)",
+    "InventarioController.exportarApartadosCSV(fileToSave)"
+  ]
+}
